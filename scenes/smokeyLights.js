@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-// Import the helper functions for UI creation, as seen in lavaLamp.js
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 /**
@@ -26,8 +25,10 @@ function createSmokeTexture() {
     return new THREE.CanvasTexture(canvas);
 }
 
-const smokeyLights = { 
-    // Scene configuration object
+export const smokeyLights = {
+    title: "Smokey Lights", // Added a title for the UI button
+    scene: null, // Added for consistency
+
     config: {
         particleCount: 700,
         particleSize: 3.5,
@@ -38,12 +39,11 @@ const smokeyLights = {
         light2Intensity: 300,
     },
 
-    // Container for THREE.js objects
     objects: {},
 
-    // Initialize the scene
-    init: function(scene) {
-        scene.fog = new THREE.Fog(0x000000, 1, 25);
+    init(scene) {
+        this.scene = scene;
+        this.scene.fog = new THREE.Fog(0x000000, 1, 25);
 
         // --- Create Smoke Particles ---
         const particleCount = this.config.particleCount;
@@ -72,18 +72,17 @@ const smokeyLights = {
         });
 
         this.objects.smokeParticles = new THREE.Points(this.objects.particleGeometry, this.objects.particleMaterial);
-        scene.add(this.objects.smokeParticles);
+        this.scene.add(this.objects.smokeParticles);
 
         // --- Create Lights ---
         this.objects.light1 = new THREE.PointLight(this.config.light1Color, this.config.light1Intensity, 30, 2);
-        scene.add(this.objects.light1);
+        this.scene.add(this.objects.light1);
 
         this.objects.light2 = new THREE.PointLight(this.config.light2Color, this.config.light2Intensity, 30, 2);
-        scene.add(this.objects.light2);
+        this.scene.add(this.objects.light2);
     },
 
-    // Update loop for animations
-    update: function(clock, mouse) {
+    update(clock, mouse) {
         const elapsedTime = clock.getElapsedTime();
 
         // Animate Lights
@@ -116,14 +115,13 @@ const smokeyLights = {
         }
     },
 
-    // Clean up the scene
-    destroy: function(scene) {
-        if (!scene || !this.objects.smokeParticles) return;
+    destroy() {
+        if (!this.scene || !this.objects.smokeParticles) return;
 
-        scene.remove(this.objects.smokeParticles);
-        scene.remove(this.objects.light1);
-        scene.remove(this.objects.light2);
-        scene.fog = null;
+        this.scene.remove(this.objects.smokeParticles);
+        this.scene.remove(this.objects.light1);
+        this.scene.remove(this.objects.light2);
+        this.scene.fog = null;
 
         this.objects.particleGeometry?.dispose();
         this.objects.particleMaterial?.dispose();
@@ -132,8 +130,7 @@ const smokeyLights = {
         this.objects = {};
     },
 
-    // Create UI controls
-    createControls: function(scene) {
+    createControls() {
         const container = document.getElementById('scene-controls-container');
         container.innerHTML = `
             <div class="control-section">
@@ -156,8 +153,8 @@ const smokeyLights = {
 
         // Add listeners for sliders. Note: Changing count requires a full scene reset.
         addSliderListeners(this.config, () => {
-            this.destroy(scene);
-            this.init(scene);
+            this.destroy();
+            this.init(this.scene);
         });
 
         // Add listeners for color pickers, which can update the scene directly.
@@ -170,5 +167,3 @@ const smokeyLights = {
         });
     }
 };
-
-export { smokeyLights };
