@@ -208,10 +208,8 @@
             <h3>Select Scene</h3>
             <button id="hideSelectorBtn" class="hide-btn" title="Hide Scenes">&times;</button>
         </div>
-        <div>
-            <button class="scene-btn active" data-scene="deepSpace">Deep Space</button>
-            <button class="scene-btn" data-scene="lavaLamp">Lava Lamp</button>
-        </div>
+        <div id="scene-buttons-container">
+            </div>
         <div id="ui-toggles">
              <button id="toggleContentBtn" class="scene-btn">Toggle Content</button>
         </div>
@@ -239,62 +237,49 @@
     </script>
     <script type="module">
         import * as THREE from 'three';
-        import { deepSpace } from './scenes/deepSpace.js';
-        import { lavaLamp } from './scenes/lavaLamp.js';
 
+        // --- Core Three.js and UI Variables ---
         let scene, camera, renderer;
         let activeSceneUpdater = null;
         const mouse = new THREE.Vector2();
         const clock = new THREE.Clock();
+        const loadedScenes = {}; // Store loaded scene objects
 
-        function init() {
+        // --- THIS IS THE PART YOUR SERVER WOULD GENERATE ---
+        // In a real application, this array would be created by your server
+        // reading the /scenes/ directory. To add a new scene, add its filename here.
+        const sceneFiles = ['deepSpace.js', 'lavaLamp.js'];
+        // ----------------------------------------------------
+
+        // --- Main Logic ---
+
+        async function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
             camera.position.z = 1;
 
             renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            await loadScenesAndBuildUI();
 
-            const scenes = { deepSpace, lavaLamp };
-
-            function switchScene(sceneName) {
-                if (activeSceneUpdater) {
-                    activeSceneUpdater.destroy(scene);
-                }
-                camera.position.set(0,0,1); // Reset camera for new scene
-                camera.rotation.set(0,0,0);
-                scene.rotation.set(0,0,0);
-
-                activeSceneUpdater = scenes[sceneName];
-
-                // Update text content based on scene
-                document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
-                 document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
-                    ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
-                    : 'Watch the mesmerizing fluid dynamics. Use the controls to change the flow.';
-
-                activeSceneUpdater.init(scene);
-                activeSceneUpdater.createControls(scene);
-
-                // Update UI
-                document.querySelectorAll('.scene-btn').forEach(btn => btn.classList.remove('active'));
-                document.querySelector(`.scene-btn[data-scene="${sceneName}"]`).classList.add('active');
-                document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
+            // Set the first scene as the default
+            if (sceneFiles.length > 0) {
+                const firstSceneName = sceneFiles[0].replace('.js', '');
+                switchScene(firstSceneName);
+            } else {
+                 document.getElementById('page-title').textContent = "No Scenes Found";
+                 document.getElementById('page-subtitle').textContent = "Add scene files to the '/scenes/' directory.";
             }
 
-            document.querySelectorAll('.scene-btn[data-scene]').forEach(btn => {
-                btn.addEventListener('click', () => switchScene(btn.dataset.scene));
-            });
-
-            switchScene('deepSpace'); // Initial scene
-
+            // --- Event Listeners ---
             window.addEventListener('resize', onWindowResize);
             window.addEventListener('mousemove', onMouseMove);
-
+            
             document.getElementById('toggleContentBtn').addEventListener('click', () => {
                 document.querySelector('.content').classList.toggle('hidden');
             });
-
+            
             // Hide/Show Controls Panel
             const controlsPanel = document.getElementById('controls');
             const hideControlsBtn = document.getElementById('hideControlsBtn');
@@ -308,17 +293,66 @@
             const showSelectorBtn = document.getElementById('showSelectorBtn');
             hideSelectorBtn.addEventListener('click', () => { selectorPanel.classList.add('hidden'); showSelectorBtn.classList.add('visible'); });
             showSelectorBtn.addEventListener('click', () => { selectorPanel.classList.remove('hidden'); showSelectorBtn.classList.remove('visible'); });
-
-            // Generate/Copy code (simplified for now)
+            
             document.getElementById('generateCodeBtn').addEventListener('click', () => { alert('Code generation for this scene is not yet implemented.'); });
+        }
+
+        async function loadScenesAndBuildUI() {
+            const container = document.getElementById('scene-buttons-container');
+            
+            for (const fileName of sceneFiles) {
+                const sceneName = fileName.replace('.js', '');
+                try {
+                    // Dynamically import the scene module from the 'scenes' directory
+                    const module = await import(`./scenes/${fileName}`);
+                    
+                    // Assumes the exported object has the same name as the scene (e.g., deepSpace)
+                    if (module[sceneName]) {
+                        loadedScenes[sceneName] = module[sceneName];
+                        
+                        // Create a button for the scene selector
+                        const btn = document.createElement('button');
+                        btn.className = 'scene-btn';
+                        btn.dataset.scene = sceneName;
+                        btn.textContent = module[sceneName].title || sceneName; // Use title from scene object
+                        btn.onclick = () => switchScene(sceneName);
+                        container.appendChild(btn);
+                    }
+                } catch (error) {
+                    console.error(`Failed to load scene: ${fileName}`, error);
+                }
+            }
+        }
+
+        function switchScene(sceneName) {
+            if (activeSceneUpdater) {
+                activeSceneUpdater.destroy(scene);
+            }
+            camera.position.set(0,0,1);
+            camera.rotation.set(0,0,0);
+            scene.rotation.set(0,0,0);
+
+            activeSceneUpdater = loadedScenes[sceneName];
+            
+            document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
+            document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
+                ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
+                : 'Watch the mesmerizing fluid dynamics. Use the controls to change the flow.';
+            
+            activeSceneUpdater.init(scene);
+            activeSceneUpdater.createControls(scene);
+
+            document.querySelectorAll('.scene-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.scene-btn[data-scene="${sceneName}"]`).classList.add('active');
+            document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
         }
 
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            if (activeSceneUpdater === lavaLamp) {
-                lavaLamp.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+            if (activeSceneUpdater === loadedScenes.lavaLamp) {
+                loadedScenes.lavaLamp.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
             }
         }
 
@@ -326,7 +360,7 @@
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         }
-
+        
         function animate() {
             requestAnimationFrame(animate);
             if (activeSceneUpdater) {
