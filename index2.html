@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Backgrounds</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Inter', sans-serif;
+            color: white;
+        }
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+            transition: opacity 0.5s ease;
+        }
+        .content.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #page-title {
+            font-size: 3rem;
+            margin: 0;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        #page-subtitle {
+            font-size: 1.2rem;
+            margin-top: 10px;
+            color: #ccc;
+        }
+        /* --- Scene Selector Styles --- */
+        #scene-selector {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            background: rgba(30, 30, 40, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateX(-50%);
+            min-width: 250px; /* Ensure a consistent width for transition calculation */
+            box-sizing: border-box;
+        }
+        #scene-selector.hidden {
+            transform: translateX(-50%) translateY(calc(100% + 40px));
+        }
+        .selector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+        .selector-header h3 {
+            margin: 0;
+            text-align: center;
+            font-size: 1rem;
+            color: #ccc;
+            font-weight: 400;
+        }
+        .scene-btn {
+            background: #444;
+            border: 1px solid #666;
+            color: white;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, border-color 0.3s;
+            font-size: 0.9rem;
+        }
+        .scene-btn:hover {
+            background-color: #555;
+            border-color: #888;
+        }
+        .scene-btn.active {
+            background-color: #4A90E2;
+            border-color: #4A90E2;
+        }
+        #ui-toggles {
+            margin-top: 10px;
+        }
+        #toggleContentBtn {
+            width: 100%;
+        }
+
+        /* --- Controls Panel Styles --- */
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            background: rgba(30, 30, 40, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #eee;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateX(0);
+        }
+        #controls.hidden {
+            transform: translateX(calc(100% + 40px));
+        }
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+        .controls-header h2 {
+            margin: 0;
+            padding: 0;
+            border: none;
+            font-size: 1.2rem;
+        }
+        .hide-btn {
+            background: none; border: none; color: #aaa; font-size: 1.8rem;
+            line-height: 1; cursor: pointer; padding: 0 5px; transition: color 0.2s;
+        }
+        .hide-btn:hover { color: white; }
+        .show-btn {
+            position: fixed; bottom: 20px; z-index: 99;
+            background: #4A90E2; border: none; border-radius: 50%; width: 50px; height: 50px;
+            font-size: 1.5rem; line-height: 50px; text-align: center; color: white;
+            cursor: pointer;
+            transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0; transform: scale(0); pointer-events: none;
+        }
+        .show-btn.visible { opacity: 1; transform: scale(1); pointer-events: auto; }
+        #showControlsBtn { right: 20px; }
+        #showSelectorBtn { left: 50%; margin-left: -25px; }
+
+        .control-row {
+            margin-bottom: 15px; display: grid;
+            grid-template-columns: 100px 1fr 40px; align-items: center; gap: 10px;
+        }
+        .control-row label { font-size: 0.9rem; }
+        .control-row input[type="range"] { width: 100%; }
+        .control-row span, .control-row input[type="color"] {
+            text-align: right; font-size: 0.9rem;
+            background: #222; padding: 2px 5px; border-radius: 4px;
+        }
+        .control-row input[type="color"] { padding: 0; border: none; width: 30px; height: 30px; }
+
+        #generateCodeBtn, #copyCodeBtn {
+            width: 100%;
+            padding: 10px;
+            background: #4A90E2;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        #code-output-container {
+            margin-top: 20px;
+            display: none;
+        }
+        #code-output {
+            width: 100%;
+            height: 150px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #eee;
+            font-family: monospace;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="content">
+        <h1 id="page-title">Welcome to the Void</h1>
+        <p id="page-subtitle">Move your mouse to explore the cosmos. Use the controls to customize your journey!</p>
+    </div>
+
+    <div id="scene-selector">
+        <div class="selector-header">
+            <h3>Select Scene</h3>
+            <button id="hideSelectorBtn" class="hide-btn" title="Hide Scenes">&times;</button>
+        </div>
+        <div>
+            <button class="scene-btn active" data-scene="deepSpace">Deep Space</button>
+            <button class="scene-btn" data-scene="lavaLamp">Lava Lamp</button>
+        </div>
+        <div id="ui-toggles">
+             <button id="toggleContentBtn" class="scene-btn">Toggle Content</button>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div class="controls-header">
+            <h2 id="controls-title">Customize Scene</h2>
+            <button id="hideControlsBtn" class="hide-btn" title="Hide Controls">&times;</button>
+        </div>
+        <div id="scene-controls-container">
+            </div>
+        <button id="generateCodeBtn">Generate Code</button>
+        <div id="code-output-container">
+            <textarea id="code-output" readonly></textarea>
+            <button id="copyCodeBtn">Copy Code</button>
+        </div>
+    </div>
+
+    <button id="showControlsBtn" class="show-btn" title="Show Controls">⚙️</button>
+    <button id="showSelectorBtn" class="show-btn" title="Show Scenes">🎨</button>
+
+    <script type="importmap">
+        { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js" } }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { deepSpace } from './deepSpace.js';
+        import { lavaLamp } from './lavaLamp.js';
+
+        let scene, camera, renderer;
+        let activeSceneUpdater = null;
+        const mouse = new THREE.Vector2();
+        const clock = new THREE.Clock();
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+            camera.position.z = 1;
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            const scenes = { deepSpace, lavaLamp };
+
+            function switchScene(sceneName) {
+                if (activeSceneUpdater) {
+                    activeSceneUpdater.destroy(scene);
+                }
+                camera.position.set(0,0,1); // Reset camera for new scene
+                camera.rotation.set(0,0,0);
+                scene.rotation.set(0,0,0);
+
+                activeSceneUpdater = scenes[sceneName];
+
+                // Update text content based on scene
+                document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
+                 document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
+                    ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
+                    : 'Watch the mesmerizing fluid dynamics. Use the controls to change the flow.';
+
+                activeSceneUpdater.init(scene);
+                activeSceneUpdater.createControls(scene);
+
+                // Update UI
+                document.querySelectorAll('.scene-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelector(`.scene-btn[data-scene="${sceneName}"]`).classList.add('active');
+                document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
+            }
+
+            document.querySelectorAll('.scene-btn[data-scene]').forEach(btn => {
+                btn.addEventListener('click', () => switchScene(btn.dataset.scene));
+            });
+
+            switchScene('deepSpace'); // Initial scene
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+
+            document.getElementById('toggleContentBtn').addEventListener('click', () => {
+                document.querySelector('.content').classList.toggle('hidden');
+            });
+
+            // Hide/Show Controls Panel
+            const controlsPanel = document.getElementById('controls');
+            const hideControlsBtn = document.getElementById('hideControlsBtn');
+            const showControlsBtn = document.getElementById('showControlsBtn');
+            hideControlsBtn.addEventListener('click', () => { controlsPanel.classList.add('hidden'); showControlsBtn.classList.add('visible'); });
+            showControlsBtn.addEventListener('click', () => { controlsPanel.classList.remove('hidden'); showControlsBtn.classList.remove('visible'); });
+
+            // Hide/Show Scene Selector
+            const selectorPanel = document.getElementById('scene-selector');
+            const hideSelectorBtn = document.getElementById('hideSelectorBtn');
+            const showSelectorBtn = document.getElementById('showSelectorBtn');
+            hideSelectorBtn.addEventListener('click', () => { selectorPanel.classList.add('hidden'); showSelectorBtn.classList.add('visible'); });
+            showSelectorBtn.addEventListener('click', () => { selectorPanel.classList.remove('hidden'); showSelectorBtn.classList.remove('visible'); });
+
+            // Generate/Copy code (simplified for now)
+            document.getElementById('generateCodeBtn').addEventListener('click', () => { alert('Code generation for this scene is not yet implemented.'); });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            if (activeSceneUpdater === lavaLamp) {
+                lavaLamp.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+            }
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (activeSceneUpdater) {
+                activeSceneUpdater.update(clock, mouse, camera);
+            }
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate();
+    </script>
+    <script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
+    <script>
+    kofiWidgetOverlay.draw('alecdvor', {
+    'type': 'floating-chat',
+    'floating-chat.donateButton.text': 'Support me',
+    'floating-chat.donateButton.background-color': '#323842',
+    'floating-chat.donateButton.text-color': '#fff'
+     });
+</script>
+</body>
+</html>
