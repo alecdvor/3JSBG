@@ -1,13 +1,14 @@
 import * as THREE from 'three';
+import { createSlider, addSliderListeners } from '../utils.js';
 
 const deepSpace = {
     title: "Deep Space",
     config: { starCount: 6000, starSize: 6.0, speedMultiplier: 1.0, nebulaCount: 50, nebulaSize: 350 },
     objects: {},
-    scene: null, // Property to hold the scene reference
+    scene: null,
 
     init(scene) {
-        this.scene = scene; // Store the scene reference
+        this.scene = scene;
         this.regenerate();
     },
 
@@ -27,17 +28,14 @@ const deepSpace = {
         }
         camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
         camera.position.y += (mouse.y * 0.5 - camera.position.y) * 0.02;
-        // FIX: Use the stored scene reference
         camera.lookAt(this.scene.position);
     },
 
     destroy() {
         if (!this.scene) return;
-        // FIX: Use 'this.scene' to remove objects
         if (this.objects.stars) this.scene.remove(this.objects.stars);
         if (this.objects.nebulas) this.scene.remove(this.objects.nebulas);
         
-        // Proper disposal of geometries and materials
         Object.values(this.objects).forEach(obj => {
             if (obj.geometry) obj.geometry.dispose();
             if (obj.material) {
@@ -64,7 +62,6 @@ const deepSpace = {
             blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
         });
         this.objects.stars = new THREE.Points(starGeometry, starMaterial);
-        // FIX: Use 'this.scene' to add objects
         this.scene.add(this.objects.stars);
 
         // Nebula Creation
@@ -79,7 +76,6 @@ const deepSpace = {
             blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.2 + Math.random() * 0.2
         });
         this.objects.nebulas = new THREE.Points(nebulaGeometry, nebulaMaterial);
-        // FIX: Use 'this.scene' to add objects
         this.scene.add(this.objects.nebulas);
     },
 
@@ -107,25 +103,22 @@ const deepSpace = {
     createControls() {
         const container = document.getElementById('scene-controls-container');
         container.innerHTML = `
-            <div class="control-row"><label for="starCount">Star Count</label><input type="range" id="starCount" min="500" max="20000" value="${this.config.starCount}" step="100"><span id="starCountValue">${this.config.starCount}</span></div>
-            <div class="control-row"><label for="starSize">Star Size</label><input type="range" id="starSize" min="1" max="20" value="${this.config.starSize}" step="0.5"><span id="starSizeValue">${this.config.starSize.toFixed(1)}</span></div>
-            <div class="control-row"><label for="speedMultiplier">Speed</label><input type="range" id="speedMultiplier" min="0.1" max="5" value="${this.config.speedMultiplier}" step="0.1"><span id="speedMultiplierValue">${this.config.speedMultiplier.toFixed(1)}</span></div>
-            <div class="control-row"><label for="nebulaCount">Nebula Count</label><input type="range" id="nebulaCount" min="0" max="200" value="${this.config.nebulaCount}" step="1"><span id="nebulaCountValue">${this.config.nebulaCount}</span></div>
-            <div class="control-row"><label for="nebulaSize">Nebula Size</label><input type="range" id="nebulaSize" min="50" max="1000" value="${this.config.nebulaSize}" step="10"><span id="nebulaSizeValue">${this.config.nebulaSize}</span></div>
+            ${createSlider('starCount', 'Star Count', 500, 20000, this.config.starCount, '100')}
+            ${createSlider('starSize', 'Star Size', 1, 20, this.config.starSize, '0.5')}
+            ${createSlider('speedMultiplier', 'Speed', 0.1, 5, this.config.speedMultiplier, '0.1')}
+            ${createSlider('nebulaCount', 'Nebula Count', 0, 200, this.config.nebulaCount, '1')}
+            ${createSlider('nebulaSize', 'Nebula Size', 50, 1000, this.config.nebulaSize, '10')}
         `;
-         Object.keys(this.config).forEach(key => {
-            document.getElementById(key).addEventListener('input', (e) => {
-                const isFloat = e.target.step.includes('.');
-                const value = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
-                this.config[key] = value;
-                const valueEl = document.getElementById(`${key}Value`);
-                if(valueEl) valueEl.textContent = isFloat ? value.toFixed(1) : value;
+        
+        // This single function call now sets up all the complex event listeners.
+        addSliderListeners(this.config, () => this.regenerate());
 
-                if (key === 'starSize' && this.objects.stars) this.objects.stars.material.size = value;
-                else if (key === 'nebulaSize' && this.objects.nebulas) this.objects.nebulas.material.size = value;
-                // FIX: Call regenerate without passing the scene, since it's now stored
-                else if (key !== 'speedMultiplier') this.regenerate();
-            });
+        // We still need separate listeners for non-recreating properties.
+        document.getElementById('starSize').addEventListener('input', (e) => {
+            if (this.objects.stars) this.objects.stars.material.size = parseFloat(e.target.value);
+        });
+        document.getElementById('nebulaSize').addEventListener('input', (e) => {
+            if (this.objects.nebulas) this.objects.nebulas.material.size = parseFloat(e.target.value);
         });
     }
 };
