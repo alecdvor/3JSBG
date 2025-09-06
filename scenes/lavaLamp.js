@@ -137,8 +137,8 @@ const lavaLamp = {
             ${createSlider('blobCount', 'Blob Count', 5, 30, this.config.blobCount, 1)}
             ${createSlider('speed', 'Speed', 0.1, 2.0, this.config.speed, 0.1)}
             ${createSlider('gooeyness', 'Gooeyness', 0.1, 1.5, this.config.threshold, 0.1)}
-            ${createSlider('heat', 'Heat', 0.0001, 0.01, this.config.heat, 0.0001)}
-            ${createSlider('heatRetention', 'Heat Retention', 0.95, 0.999, this.config.heatRetention, 0.001)}
+            ${createSlider('heat', 'Heat', 0.0, 0.01, this.config.heat, 0.0001)}
+            ${createSlider('heatRetention', 'Heat Retention', 0.0, 0.999, this.config.heatRetention, 0.001)}
             ${createSlider('mouseInteraction', 'Mouse Power', 0.0, 5.0, this.config.mouseInteraction, 0.1)}
             ${createColorPicker('color1', 'Color 1', this.config.color1)}
             ${createColorPicker('color2', 'Color 2', this.config.color2)}
