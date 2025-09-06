@@ -26,8 +26,8 @@ function createSmokeTexture() {
 }
 
 export const smokeyLights = {
-    title: "Smokey Lights", // Added a title for the UI button
-    scene: null, // Added for consistency
+    title: "Smokey Lights",
+    scene: null,
 
     config: {
         particleCount: 700,
