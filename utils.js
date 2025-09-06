@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three'; 
 
 // ... (createSoftCircleTexture, createStars, createNebulas functions remain the same) ...
 
