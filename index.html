@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Interactive Deep Space Background</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000005;
+            font-family: 'Inter', sans-serif;
+            color: white;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+            padding: 20vh 20px 0;
+        }
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(76, 175, 255, 0.5), 0 0 20px rgba(255, 76, 175, 0.5);
+        }
+        p {
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 1rem auto;
+            line-height: 1.6;
+        }
+
+        /* --- Controls Panel Styles --- */
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(30, 30, 40, 0.8);
+            padding: 20px;
+            border-radius: 15px;
+            z-index: 100;
+            color: #f0f0f0;
+            width: 300px;
+            box-sizing: border-box;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: left;
+            transform: translateX(0);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #controls.hidden {
+            transform: translateX(calc(100% + 40px));
+        }
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #555;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .controls-header h2 {
+            margin: 0;
+            padding: 0;
+            border: none;
+            font-size: 1.2rem;
+        }
+        #hideControlsBtn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.8rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 5px;
+            transition: color 0.2s;
+        }
+        #hideControlsBtn:hover {
+            color: white;
+        }
+        #showControlsBtn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 99;
+            background: #4A90E2;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.5rem;
+            line-height: 50px;
+            text-align: center;
+            color: white;
+            cursor: pointer;
+            transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: scale(0);
+            pointer-events: none;
+        }
+        #showControlsBtn.visible {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+        .control-row {
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: 100px 1fr 40px;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-row label {
+            font-size: 0.9rem;
+        }
+        .control-row input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        .control-row span {
+            font-size: 0.9rem;
+            text-align: right;
+            font-family: monospace;
+        }
+        #generateCodeBtn, #copyCodeBtn {
+            width: 100%;
+            padding: 10px;
+            background: #4A90E2;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        #generateCodeBtn:hover, #copyCodeBtn:hover {
+            background: #357ABD;
+        }
+        #code-output-container {
+            margin-top: 20px;
+        }
+        #code-output {
+            width: 100%;
+            height: 200px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            padding: 10px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <!-- Website Content -->
+    <div class="content">
+        <h1>Welcome to Deep Space</h1>
+        <p>Move your mouse to explore the cosmos. Use the controls to customize your journey!</p>
+    </div>
+
+    <!-- Controls Panel -->
+    <div id="controls">
+        <div class="controls-header">
+            <h2>Customize Scene</h2>
+            <button id="hideControlsBtn" title="Hide Controls">&times;</button>
+        </div>
+        <div class="control-row">
+            <label for="starCount">Star Count</label>
+            <input type="range" id="starCount" min="500" max="20000" value="6000" step="100">
+            <span id="starCountValue">6000</span>
+        </div>
+        <div class="control-row">
+            <label for="starSize">Star Size</label>
+            <input type="range" id="starSize" min="1" max="20" value="6" step="0.5">
+            <span id="starSizeValue">6.0</span>
+        </div>
+        <div class="control-row">
+            <label for="speedMultiplier">Speed</label>
+            <input type="range" id="speedMultiplier" min="0.1" max="5" value="1" step="0.1">
+            <span id="speedMultiplierValue">1.0</span>
+        </div>
+        <div class="control-row">
+            <label for="nebulaCount">Nebula Count</label>
+            <input type="range" id="nebulaCount" min="0" max="200" value="50" step="1">
+            <span id="nebulaCountValue">50</span>
+        </div>
+        <div class="control-row">
+            <label for="nebulaSize">Nebula Size</label>
+            <input type="range" id="nebulaSize" min="50" max="1000" value="350" step="10">
+            <span id="nebulaSizeValue">350</span>
+        </div>
+        <button id="generateCodeBtn">Generate Code</button>
+        <div id="code-output-container" style="display: none;">
+            <h3>Your Custom Code Snippet</h3>
+            <textarea id="code-output" readonly></textarea>
+            <button id="copyCodeBtn">Copy Code</button>
+        </div>
+    </div>
+    <button id="showControlsBtn" title="Show Controls">⚙️</button>
+
+    <!-- Importmap for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- Global Variables ---
+        let scene, camera, renderer, stars, nebulas;
+        const mouse = new THREE.Vector2();
+        const clock = new THREE.Clock();
+
+        // --- Configuration ---
+        const config = {
+            starCount: 6000,
+            starSize: 6.0,
+            speedMultiplier: 1.0,
+            nebulaCount: 50,
+            nebulaSize: 350
+        };
+
+        // --- Main Initialization ---
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+            camera.position.z = 1;
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            
+            regenerateScene();
+            setupEventListeners();
+            animate();
+        }
+
+        // --- Scene Generation ---
+        function regenerateScene() {
+            // Clean up existing objects from the scene
+            if (stars) {
+                scene.remove(stars);
+                stars.geometry.dispose();
+                stars.material.map.dispose();
+                stars.material.dispose();
+            }
+            if (nebulas) {
+                scene.remove(nebulas);
+                nebulas.geometry.dispose();
+                nebulas.material.map.dispose();
+                nebulas.material.dispose();
+            }
+
+            // --- Star Creation ---
+            if (config.starCount > 0) {
+                const starVertices = [];
+                for (let i = 0; i < config.starCount; i++) {
+                    const x = (Math.random() - 0.5) * 2000;
+                    const y = (Math.random() - 0.5) * 2000;
+                    const z = -Math.random() * 2000;
+                    starVertices.push(x, y, z);
+                }
+                const starGeometry = new THREE.BufferGeometry();
+                starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+                const starMaterial = new THREE.PointsMaterial({
+                    map: generateStarTexture(),
+                    size: config.starSize,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    transparent: true,
+                });
+                stars = new THREE.Points(starGeometry, starMaterial);
+                scene.add(stars);
+            }
+
+            // --- Nebulous Stripes Creation ---
+            if (config.nebulaCount > 0) {
+                const nebulaVertices = [];
+                for (let i = 0; i < config.nebulaCount; i++) {
+                    const x = (Math.random() - 0.5) * 3000;
+                    const y = (Math.random() - 0.5) * 3000;
+                    const z = -Math.random() * 3000 - 1000;
+                    nebulaVertices.push(x, y, z);
+                }
+                const nebulaGeometry = new THREE.BufferGeometry();
+                nebulaGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nebulaVertices, 3));
+                const nebulaMaterial = new THREE.PointsMaterial({
+                    map: generateNebulaTexture(),
+                    size: config.nebulaSize,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    transparent: true,
+                    opacity: 0.2 + Math.random() * 0.2
+                });
+                nebulas = new THREE.Points(nebulaGeometry, nebulaMaterial);
+                scene.add(nebulas);
+            }
+        }
+
+        // --- Helper Functions for Textures ---
+        function generateStarTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const context = canvas.getContext('2d');
+            const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.2, 'rgba(255,255,255,0.7)');
+            gradient.addColorStop(0.7, 'rgba(255,255,255,0.2)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function generateNebulaTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const context = canvas.getContext('2d');
+            const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
+            const r = Math.floor(Math.random() * 100 + 155);
+            const g = Math.floor(Math.random() * 100 + 50);
+            const b = Math.floor(Math.random() * 155 + 100);
+            gradient.addColorStop(0, `rgba(${r},${g},${b},0.3)`);
+            gradient.addColorStop(0.2, `rgba(${r},${g},${b},0.1)`);
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 256, 256);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- Event Listeners and Handlers ---
+        function setupEventListeners() {
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('mousemove', onMouseMove);
+
+            // Hide/Show Controls
+            const controlsPanel = document.getElementById('controls');
+            const hideBtn = document.getElementById('hideControlsBtn');
+            const showBtn = document.getElementById('showControlsBtn');
+
+            hideBtn.addEventListener('click', () => {
+                controlsPanel.classList.add('hidden');
+                showBtn.classList.add('visible');
+            });
+
+            showBtn.addEventListener('click', () => {
+                controlsPanel.classList.remove('hidden');
+                showBtn.classList.remove('visible');
+            });
+
+            // UI Controls
+            Object.keys(config).forEach(key => {
+                const inputEl = document.getElementById(key);
+                if (inputEl) {
+                    inputEl.addEventListener('input', (e) => {
+                        const isFloat = inputEl.step.includes('.');
+                        const value = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
+                        config[key] = value;
+                        
+                        const valueSpan = document.getElementById(`${key}Value`);
+                        if (valueSpan) {
+                           valueSpan.textContent = isFloat ? value.toFixed(1) : value;
+                        }
+
+                        // Efficiently update without full regeneration where possible
+                        if (key === 'starSize' && stars) stars.material.size = value;
+                        else if (key === 'nebulaSize' && nebulas) nebulas.material.size = value;
+                        else if (key !== 'speedMultiplier') regenerateScene();
+                    });
+                }
+            });
+
+            document.getElementById('generateCodeBtn').addEventListener('click', displayGeneratedCode);
+            document.getElementById('copyCodeBtn').addEventListener('click', copyGeneratedCode);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        // --- Code Generation ---
+        function displayGeneratedCode() {
+            const codeContainer = document.getElementById('code-output-container');
+            const codeOutput = document.getElementById('code-output');
+            codeOutput.value = `// Paste this entire script into a <script type="module"> tag in your HTML file.
+// Make sure you have imported Three.js: https://threejs.org/docs/index.html#manual/en/introduction/Installation
+
+import * as THREE from 'three';
+
+let scene, camera, renderer;
+const mouse = new THREE.Vector2();
+
+function init() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+    camera.position.z = 1;
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const starVertices = [];
+    for (let i = 0; i < ${config.starCount}; i++) {
+        const x = (Math.random() - 0.5) * 2000;
+        const y = (Math.random() - 0.5) * 2000;
+        const z = -Math.random() * 2000;
+        starVertices.push(x, y, z);
+    }
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+    const starMaterial = new THREE.PointsMaterial({
+        map: generateTexture('star'),
+        size: ${config.starSize.toFixed(1)},
+        blending: THREE.AdditiveBlending,
+        depthWrite: false, transparent: true,
+    });
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
+    const nebulaVertices = [];
+    for(let i = 0; i < ${config.nebulaCount}; i++) {
+        const x = (Math.random() - 0.5) * 3000;
+        const y = (Math.random() - 0.5) * 3000;
+        const z = -Math.random() * 3000 - 1000;
+        nebulaVertices.push(x, y, z);
+    }
+    const nebulaGeometry = new THREE.BufferGeometry();
+    nebulaGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nebulaVertices, 3));
+    const nebulaMaterial = new THREE.PointsMaterial({
+        map: generateTexture('nebula'),
+        size: ${config.nebulaSize},
+        blending: THREE.AdditiveBlending,
+        depthWrite: false, transparent: true, opacity: 0.3
+    });
+    const nebulas = new THREE.Points(nebulaGeometry, nebulaMaterial);
+    scene.add(nebulas);
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    document.addEventListener('mousemove', (e) => {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+    
+    animate(stars, nebulas);
+}
+
+function generateTexture(type) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (type === 'star') {
+        canvas.width = 32; canvas.height = 32;
+        const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255,255,255,1)');
+        gradient.addColorStop(0.2, 'rgba(255,255,255,0.7)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 32, 32);
+    } else { // nebula
+        canvas.width = 256; canvas.height = 256;
+        const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
+        const r = Math.floor(Math.random() * 100 + 155);
+        const g = Math.floor(Math.random() * 100 + 50);
+        const b = Math.floor(Math.random() * 155 + 100);
+        gradient.addColorStop(0, \`rgba(\${r},\${g},\${b},0.3)\`);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 256, 256);
+    }
+    return new THREE.CanvasTexture(canvas);
+}
+
+const clock = new THREE.Clock();
+function animate(stars, nebulas) {
+    requestAnimationFrame(() => animate(stars, nebulas));
+    const elapsedTime = clock.getElapsedTime();
+    const positions = stars.geometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+        const speed = 10 + (i % 9) * 10;
+        positions[i + 2] += speed * 0.01 * ${config.speedMultiplier.toFixed(1)};
+        if (positions[i + 2] > camera.position.z) positions[i + 2] = -2000;
+    }
+    stars.geometry.attributes.position.needsUpdate = true;
+    nebulas.rotation.z = elapsedTime * 0.01;
+    camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
+    camera.position.y += (mouse.y * 0.5 - camera.position.y) * 0.02;
+    camera.lookAt(scene.position);
+    renderer.render(scene, camera);
+}
+
+init();
+`;
+            codeContainer.style.display = 'block';
+        }
+
+        function copyGeneratedCode() {
+            const codeOutput = document.getElementById('code-output');
+            const copyBtn = document.getElementById('copyCodeBtn');
+            codeOutput.select();
+            // Using execCommand for broader compatibility in sandboxed environments
+            document.execCommand('copy'); 
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy Code'; }, 2000);
+        }
+
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsedTime = clock.getElapsedTime();
+
+            if (stars) {
+                const positions = stars.geometry.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    const speed = 10 + (i % 9) * 10;
+                    positions[i + 2] += speed * 0.01 * config.speedMultiplier;
+                    if (positions[i + 2] > camera.position.z) {
+                        positions[i + 2] = -2000;
+                    }
+                }
+                stars.geometry.attributes.position.needsUpdate = true;
+            }
+            
+            if (nebulas) {
+                nebulas.rotation.z = elapsedTime * 0.01;
+            }
+
+            camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
+            camera.position.y += (mouse.y * 0.5 - camera.position.y) * 0.02;
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
+
+
