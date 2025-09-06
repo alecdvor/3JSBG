@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const lavaLamp = {
-    title: "Lava Lamp", // Added a title for the UI
-    scene: null, // Added for consistency
+    title: "Lava Lamp",
+    scene: null,
 
     config: {
         blobCount: 15,
@@ -11,7 +11,8 @@ export const lavaLamp = {
         threshold: 0.7,
         heat: 0.0015,
         heatRetention: 0.99,
-        mouseInteraction: 1.0,
+        mouseRepelRadius: 0.2,
+        mouseRepelStrength: 0.005,
         color1: '#ff007f',
         color2: '#00ffff',
         bgColor: '#1a0033'
@@ -40,8 +41,6 @@ export const lavaLamp = {
                 u_blobs: { value: this.blobs.map(b => b.pos) },
                 u_radii: { value: this.blobs.map(b => b.radius) },
                 u_threshold: { value: this.config.threshold },
-                u_mouse: { value: new THREE.Vector2() },
-                u_interaction: { value: this.config.mouseInteraction },
                 u_color1: { value: new THREE.Color(this.config.color1) },
                 u_color2: { value: new THREE.Color(this.config.color2) },
                 u_bgColor: { value: new THREE.Color(this.config.bgColor) }
@@ -56,13 +55,10 @@ export const lavaLamp = {
             fragmentShader: `
                 precision mediump float;
                 varying vec2 vUv;
-                uniform float u_time;
                 uniform vec2 u_resolution;
                 uniform vec2 u_blobs[${this.config.blobCount}];
                 uniform float u_radii[${this.config.blobCount}];
                 uniform float u_threshold;
-                uniform vec2 u_mouse;
-                uniform float u_interaction;
                 uniform vec3 u_color1;
                 uniform vec3 u_color2;
                 uniform vec3 u_bgColor;
@@ -71,9 +67,6 @@ export const lavaLamp = {
                     vec2 p = vUv;
                     p.x *= u_resolution.x / u_resolution.y;
 
-                    vec2 mouse_p = u_mouse;
-                    mouse_p.x *= u_resolution.x / u_resolution.y;
-
                     float sum = 0.0;
                     for (int i = 0; i < ${this.config.blobCount}; i++) {
                         vec2 blob_p = u_blobs[i];
@@ -81,8 +74,6 @@ export const lavaLamp = {
                         float r = u_radii[i];
                         sum += r * r / distance(p, blob_p);
                     }
-
-                    sum += u_interaction * 0.05 / distance(p, mouse_p);
 
                     if (sum > u_threshold) {
                         gl_FragColor = vec4(mix(u_color1, u_color2, vUv.y), 1.0);
@@ -101,35 +92,44 @@ export const lavaLamp = {
         
         const material = this.objects.material;
         material.uniforms.u_time.value = clock.getElapsedTime();
-        material.uniforms.u_mouse.value.set((mouse.x + 1) / 2, (mouse.y + 1) / 2);
-        material.uniforms.u_interaction.value = this.config.mouseInteraction;
+        
+        const mousePos = new THREE.Vector2((mouse.x + 1) / 2, (mouse.y + 1) / 2);
 
         for (let i = 0; i < this.config.blobCount; i++) {
             const blob = this.blobs[i];
 
+            // --- NEW: Mouse Repulsion Physics ---
+            const dist = mousePos.distanceTo(blob.pos);
+            if (dist < this.config.mouseRepelRadius) {
+                const repelForce = (1 - dist / this.config.mouseRepelRadius) * this.config.mouseRepelStrength;
+                const repelVector = new THREE.Vector2().subVectors(blob.pos, mousePos).normalize();
+                blob.vel.addScaledVector(repelVector, repelForce);
+            }
+
             // Apply force based on heat (buoyancy)
-            // 0.5 is the neutral point. heat > 0.5 -> rise, heat < 0.5 -> fall
             blob.vel.y += (blob.heat - 0.5) * 0.0001 * this.config.speed;
             
             blob.pos.add(blob.vel);
 
-            // --- CORRECTED Heat Exchange Logic ---
-            if (blob.pos.y < 0.1) { // If at the bottom, heat up
+            // Heat Exchange Logic
+            if (blob.pos.y < 0.1) {
                 blob.heat += this.config.heat * (1.0 - blob.heat);
-            } else if (blob.pos.y > 0.9) { // If at the top, cool down
+            } else if (blob.pos.y > 0.9) {
                 blob.heat -= this.config.heat * blob.heat;
             }
 
-            // Natural heat loss over time
             blob.heat *= this.config.heatRetention;
             blob.heat = Math.max(0.0, Math.min(1.0, blob.heat));
 
-            // Wall collisions
-            if (blob.pos.x < 0.01 || blob.pos.x > 0.99) { blob.vel.x *= -0.9; }
-            if (blob.pos.y < 0.01 || blob.pos.y > 0.99) { blob.vel.y *= -0.9; }
+            // Wall collisions and damping
+            if (blob.pos.x < 0.01 || blob.pos.x > 0.99) { blob.vel.x *= -0.5; }
+            if (blob.pos.y < 0.01 || blob.pos.y > 0.99) { blob.vel.y *= -0.5; }
             
             blob.pos.x = Math.max(0.01, Math.min(0.99, blob.pos.x));
             blob.pos.y = Math.max(0.01, Math.min(0.99, blob.pos.y));
+
+            // Slow down velocity over time (friction)
+            blob.vel.multiplyScalar(0.98);
 
             material.uniforms.u_blobs.value[i] = blob.pos;
         }
@@ -151,7 +151,10 @@ export const lavaLamp = {
             ${createSlider('threshold', 'Gooeyness', 0.1, 1.5, this.config.threshold, '0.1')}
             ${createSlider('heat', 'Heat/Cool Rate', 0.0005, 0.01, this.config.heat, '0.0001')}
             ${createSlider('heatRetention', 'Heat Retention', 0.95, 0.999, this.config.heatRetention, '0.001')}
-            ${createSlider('mouseInteraction', 'Mouse Power', 0.0, 5.0, this.config.mouseInteraction, '0.1')}
+            <h3>Mouse Interaction</h3>
+            ${createSlider('mouseRepelRadius', 'Repel Radius', 0.01, 0.5, this.config.mouseRepelRadius, '0.01')}
+            ${createSlider('mouseRepelStrength', 'Repel Strength', 0.001, 0.02, this.config.mouseRepelStrength, '0.001')}
+            <h3>Colors</h3>
             ${createColorPicker('color1', 'Color 1', this.config.color1)}
             ${createColorPicker('color2', 'Color 2', this.config.color2)}
             ${createColorPicker('bgColor', 'Background', this.config.bgColor)}
