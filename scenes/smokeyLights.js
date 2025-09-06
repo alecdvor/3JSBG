@@ -26,7 +26,7 @@ function createSmokeTexture() {
     return new THREE.CanvasTexture(canvas);
 }
 
-export const smokeyLights = {
+const smokeyLights = {
     // Scene configuration object
     config: {
         particleCount: 700,
