@@ -157,15 +157,28 @@
 
         .control-row {
             margin-bottom: 15px; display: grid;
-            grid-template-columns: 100px 1fr 40px; align-items: center; gap: 10px;
+            /* Adjusted grid to give text input more space */
+            grid-template-columns: 100px 1fr 60px; 
+            align-items: center; gap: 10px;
         }
         .control-row label { font-size: 0.9rem; }
         .control-row input[type="range"] { width: 100%; }
-        .control-row span, .control-row input[type="color"] {
+        
+        /* Updated styles for both span and the new input */
+        .control-row span, .control-row input[type="text"], .control-row input[type="color"] {
             text-align: right; font-size: 0.9rem;
-            background: #222; padding: 2px 5px; border-radius: 4px;
+            background: #222; padding: 5px; border-radius: 4px;
+            color: #eee;
+            border: 1px solid #444;
+            box-sizing: border-box;
         }
-        .control-row input[type="color"] { padding: 0; border: none; width: 30px; height: 30px; }
+        .control-row input[type="text"] {
+            width: 100%;
+            font-family: 'Inter', sans-serif;
+        }
+        .control-row input[type="color"] { 
+            padding: 0; border: none; width: 30px; height: 30px; 
+        }
 
         #generateCodeBtn, #copyCodeBtn {
             width: 100%;
@@ -203,30 +216,25 @@
         <p id="page-subtitle">Move your mouse to explore the cosmos. Use the controls to customize your journey!</p>
     </div>
 
-    <!-- Scene Selector -->
     <div id="scene-selector">
         <div class="selector-header">
             <h3>Select Scene</h3>
             <button id="hideSelectorBtn" class="hide-btn" title="Hide Scenes">&times;</button>
         </div>
-        <div>
-            <button class="scene-btn active" data-scene="deepSpace">Deep Space</button>
-            <button class="scene-btn" data-scene="lavaLamp">Lava Lamp</button>
-        </div>
+        <div id="scene-buttons-container">
+            </div>
         <div id="ui-toggles">
              <button id="toggleContentBtn" class="scene-btn">Toggle Content</button>
         </div>
     </div>
 
-    <!-- Controls Panel -->
     <div id="controls">
         <div class="controls-header">
             <h2 id="controls-title">Customize Scene</h2>
             <button id="hideControlsBtn" class="hide-btn" title="Hide Controls">&times;</button>
         </div>
         <div id="scene-controls-container">
-            <!-- Scene-specific controls will be injected here -->
-        </div>
+            </div>
         <button id="generateCodeBtn">Generate Code</button>
         <div id="code-output-container">
             <textarea id="code-output" readonly></textarea>
@@ -243,458 +251,48 @@
     <script type="module">
         import * as THREE from 'three';
 
+        // --- Core Three.js and UI Variables ---
         let scene, camera, renderer;
         let activeSceneUpdater = null;
         const mouse = new THREE.Vector2();
         const clock = new THREE.Clock();
+        const loadedScenes = {}; // Store loaded scene objects
 
-
-        // --- SCENE DEFINITIONS ---
-
-        const deepSpace = {
-            title: "Deep Space",
-            config: { starCount: 6000, starSize: 6.0, speedMultiplier: 1.0, nebulaCount: 50, nebulaSize: 350 },
-            objects: {}, // To hold stars, nebulas etc.
-            
-            init(scene) {
-                this.regenerate(scene);
-            },
-
-            update(clock) {
-                const elapsedTime = clock.getElapsedTime();
-                if (this.objects.stars) {
-                    const positions = this.objects.stars.geometry.attributes.position.array;
-                    for (let i = 0; i < positions.length; i += 3) {
-                        const speed = 10 + (i % 9) * 10;
-                        positions[i + 2] += speed * 0.01 * this.config.speedMultiplier;
-                        if (positions[i + 2] > camera.position.z) positions[i + 2] = -2000;
-                    }
-                    this.objects.stars.geometry.attributes.position.needsUpdate = true;
-                }
-                if (this.objects.nebulas) {
-                    this.objects.nebulas.rotation.z = elapsedTime * 0.01;
-                }
-                camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
-                camera.position.y += (mouse.y * 0.5 - camera.position.y) * 0.02;
-                camera.lookAt(scene.position);
-            },
-
-            destroy(scene) {
-                if (this.objects.stars) scene.remove(this.objects.stars);
-                if (this.objects.nebulas) scene.remove(this.objects.nebulas);
-                // Proper disposal of geometries and materials
-                Object.values(this.objects).forEach(obj => {
-                    if (obj.geometry) obj.geometry.dispose();
-                    if (obj.material) {
-                         if (obj.material.map) obj.material.map.dispose();
-                         obj.material.dispose();
-                    }
-                });
-                this.objects = {};
-            },
-
-            regenerate(scene) {
-                this.destroy(scene);
-                // Star Creation
-                const starVertices = [];
-                for (let i = 0; i < this.config.starCount; i++) {
-                    starVertices.push((Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000, -Math.random() * 2000);
-                }
-                const starGeometry = new THREE.BufferGeometry();
-                starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-                const starMaterial = new THREE.PointsMaterial({
-                    map: this.generateTexture('star'), size: this.config.starSize,
-                    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
-                });
-                this.objects.stars = new THREE.Points(starGeometry, starMaterial);
-                scene.add(this.objects.stars);
-
-                // Nebula Creation
-                const nebulaVertices = [];
-                for(let i = 0; i < this.config.nebulaCount; i++) {
-                    nebulaVertices.push((Math.random() - 0.5) * 3000, (Math.random() - 0.5) * 3000, -Math.random() * 3000 - 1000);
-                }
-                const nebulaGeometry = new THREE.BufferGeometry();
-                nebulaGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nebulaVertices, 3));
-                const nebulaMaterial = new THREE.PointsMaterial({
-                    map: this.generateTexture('nebula'), size: this.config.nebulaSize,
-                    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.2 + Math.random() * 0.2
-                });
-                this.objects.nebulas = new THREE.Points(nebulaGeometry, nebulaMaterial);
-                scene.add(this.objects.nebulas);
-            },
-
-            generateTexture(type) {
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                if(type === 'star') {
-                    canvas.width = 32; canvas.height = 32;
-                    const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
-                    gradient.addColorStop(0, 'rgba(255,255,255,1)');
-                    gradient.addColorStop(0.2, 'rgba(255,255,255,0.7)');
-                    gradient.addColorStop(1, 'rgba(255,255,255,0)');
-                    context.fillStyle = gradient; context.fillRect(0, 0, 32, 32);
-                } else { // nebula
-                    canvas.width = 256; canvas.height = 256;
-                    const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
-                    const r=Math.floor(Math.random()*100+155), g=Math.floor(Math.random()*100+50), b=Math.floor(Math.random()*155+100);
-                    gradient.addColorStop(0, `rgba(${r},${g},${b},0.3)`);
-                    gradient.addColorStop(1, 'rgba(0,0,0,0)');
-                    context.fillStyle = gradient; context.fillRect(0, 0, 256, 256);
-                }
-                return new THREE.CanvasTexture(canvas);
-            },
-
-            createControls() {
-                const container = document.getElementById('scene-controls-container');
-                container.innerHTML = `
-                    <div class="control-row"><label for="starCount">Star Count</label><input type="range" id="starCount" min="500" max="20000" value="${this.config.starCount}" step="100"><span id="starCountValue">${this.config.starCount}</span></div>
-                    <div class="control-row"><label for="starSize">Star Size</label><input type="range" id="starSize" min="1" max="20" value="${this.config.starSize}" step="0.5"><span id="starSizeValue">${this.config.starSize.toFixed(1)}</span></div>
-                    <div class="control-row"><label for="speedMultiplier">Speed</label><input type="range" id="speedMultiplier" min="0.1" max="5" value="${this.config.speedMultiplier}" step="0.1"><span id="speedMultiplierValue">${this.config.speedMultiplier.toFixed(1)}</span></div>
-                    <div class="control-row"><label for="nebulaCount">Nebula Count</label><input type="range" id="nebulaCount" min="0" max="200" value="${this.config.nebulaCount}" step="1"><span id="nebulaCountValue">${this.config.nebulaCount}</span></div>
-                    <div class="control-row"><label for="nebulaSize">Nebula Size</label><input type="range" id="nebulaSize" min="50" max="1000" value="${this.config.nebulaSize}" step="10"><span id="nebulaSizeValue">${this.config.nebulaSize}</span></div>
-                `;
-                 Object.keys(this.config).forEach(key => {
-                    document.getElementById(key).addEventListener('input', (e) => {
-                        const isFloat = e.target.step.includes('.');
-                        const value = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
-                        this.config[key] = value;
-                        const valueEl = document.getElementById(`${key}Value`);
-                        if(valueEl) valueEl.textContent = isFloat ? value.toFixed(1) : value;
-
-                        if (key === 'starSize' && this.objects.stars) this.objects.stars.material.size = value;
-                        else if (key === 'nebulaSize' && this.objects.nebulas) this.objects.nebulas.material.size = value;
-                        else if (key !== 'speedMultiplier') this.regenerate(scene);
-                    });
-                });
-            }
-        };
-
-        const lavaLamp = {
-            config: {
-                blobCount: 15,
-                speed: 0.5,
-                threshold: 0.7,
-                heat: 0.001,
-                heatRetention: 0.99,
-                mouseInteraction: 1.0,
-                color1: '#ff007f',
-                color2: '#00ffff',
-                bgColor: '#1a0033'
-            },
-            objects: {},
-            blobs: [],
-            init: function() {
-                this.blobs = [];
-                for (let i = 0; i < this.config.blobCount; i++) {
-                    this.blobs.push({
-                        pos: new THREE.Vector2(Math.random(), Math.random()),
-                        vel: new THREE.Vector2((Math.random() - 0.5) * 0.002, (Math.random() - 0.5) * 0.002),
-                        radius: 0.05 + Math.random() * 0.1,
-                        heat: Math.random()
-                    });
-                }
-
-                const geometry = new THREE.PlaneGeometry(2, 2);
-                this.objects.material = new THREE.ShaderMaterial({
-                    uniforms: {
-                        u_time: { value: 0 },
-                        u_resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-                        u_blobs: { value: this.blobs.map(b => b.pos) },
-                        u_radii: { value: this.blobs.map(b => b.radius) },
-                        u_threshold: { value: this.config.threshold },
-                        u_mouse: { value: new THREE.Vector2() },
-                        u_interaction: { value: this.config.mouseInteraction },
-                        u_color1: { value: new THREE.Color(this.config.color1) },
-                        u_color2: { value: new THREE.Color(this.config.color2) },
-                        u_bgColor: { value: new THREE.Color(this.config.bgColor) }
-                    },
-                    vertexShader: `
-                        varying vec2 vUv;
-                        void main() {
-                            vUv = uv;
-                            gl_Position = vec4(position, 1.0);
-                        }
-                    `,
-                    fragmentShader: `
-                        varying vec2 vUv;
-                        uniform float u_time;
-                        uniform vec2 u_resolution;
-                        uniform vec2 u_blobs[${this.config.blobCount}];
-                        uniform float u_radii[${this.config.blobCount}];
-                        uniform float u_threshold;
-                        uniform vec2 u_mouse;
-                        uniform float u_interaction;
-                        uniform vec3 u_color1;
-                        uniform vec3 u_color2;
-                        uniform vec3 u_bgColor;
-
-                        void main() {
-                            vec2 p = vUv * 2.0 - 1.0;
-                            p.x *= u_resolution.x / u_resolution.y;
-
-                            vec2 mouse_p = u_mouse * 2.0 - 1.0;
-                            mouse_p.x *= u_resolution.x / u_resolution.y;
-
-                            float sum = 0.0;
-                            for (int i = 0; i < ${this.config.blobCount}; i++) {
-                                vec2 pos = u_blobs[i] * 2.0 - 1.0;
-                                pos.x *= u_resolution.x / u_resolution.y;
-                                float radius = u_radii[i];
-                                sum += radius * radius / pow(distance(p, pos), 2.5);
-                            }
-
-                            // Mouse interaction
-                            sum += u_interaction * 0.2 / pow(distance(p, mouse_p), 2.0);
-
-                            if (sum > u_threshold) {
-                                gl_FragColor = vec4(mix(u_color1, u_color2, vUv.y), 1.0);
-                            } else {
-                                gl_FragColor = vec4(u_bgColor, 1.0);
-                            }
-                        }
-                    `
-                });
-                this.objects.mesh = new THREE.Mesh(geometry, this.objects.material);
-                scene.add(this.objects.mesh);
-            },
-            update: function(clock) {
-                const material = this.objects.material;
-                material.uniforms.u_time.value = clock.getElapsedTime();
-                
-                // Convert mouse from [-1, 1] range to [0, 1] for the shader
-                const shaderMouseX = (mouse.x + 1) / 2;
-                const shaderMouseY = (mouse.y + 1) / 2;
-                material.uniforms.u_mouse.value.set(shaderMouseX, shaderMouseY);
-                
-                material.uniforms.u_interaction.value = this.config.mouseInteraction;
-
-                for (let i = 0; i < this.config.blobCount; i++) {
-                    const blob = this.blobs[i];
-                    
-                    // Apply heat physics
-                    blob.vel.y += (0.5 - blob.heat) * 0.0001 * this.config.speed;
-                    
-                    blob.pos.add(blob.vel);
-                    
-                    // Heat exchange
-                    if (blob.pos.y < 0.1) { // Bottom of screen
-                         blob.heat += this.config.heat;
-                    }
-                    blob.heat *= this.config.heatRetention; // Heat loss over time
-                    blob.heat = Math.max(0.0, Math.min(1.0, blob.heat));
-
-
-                    // Wall collisions
-                    if(blob.pos.x < 0.01) { blob.pos.x = 0.01; blob.vel.x *= -0.5; }
-                    if(blob.pos.x > 0.99) { blob.pos.x = 0.99; blob.vel.x *= -0.5; }
-                    if(blob.pos.y < 0.01) { blob.pos.y = 0.01; blob.vel.y *= -0.5; }
-                    if(blob.pos.y > 0.99) { blob.pos.y = 0.99; blob.vel.y *= -0.5; }
-
-
-                    material.uniforms.u_blobs.value[i] = blob.pos;
-                }
-            },
-            destroy: function() {
-                scene.remove(this.objects.mesh);
-                this.objects.mesh.geometry.dispose();
-                this.objects.material.dispose();
-            },
-            createControls: function() {
-                 const container = document.getElementById('scene-controls-container');
-                container.innerHTML = `
-                    ${createSlider('blobCount', 'Blob Count', 5, 30, this.config.blobCount, 1)}
-                    ${createSlider('speed', 'Speed', 0.1, 2.0, this.config.speed, 0.1)}
-                    ${createSlider('threshold', 'Gooeyness', 0.1, 1.5, this.config.threshold, 0.1)}
-                    ${createSlider('heat', 'Heat', 0.0001, 0.01, this.config.heat, 0.0001)}
-                    ${createSlider('heatRetention', 'Heat Retention', 0.95, 0.999, this.config.heatRetention, 0.001)}
-                    ${createSlider('mouseInteraction', 'Mouse Power', 0.0, 5.0, this.config.mouseInteraction, 0.1)}
-                    ${createColorPicker('color1', 'Color 1', this.config.color1)}
-                    ${createColorPicker('color2', 'Color 2', this.config.color2)}
-                    ${createColorPicker('bgColor', 'Background', this.config.bgColor)}
-                `;
-                addSliderListeners(this.config, () => { lavaLamp.destroy(); lavaLamp.init(); });
-                addColorListeners(this.config, (key, value) => {
-                    lavaLamp.objects.material.uniforms['u_' + key].value.set(value);
-                });
-            }
-        };
-
-
-        // --- Helper Functions ---
-
-        function createSoftCircleTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64;
-            canvas.height = 64;
-            const context = canvas.getContext('2d');
-            const gradient = context.createRadialGradient(
-                canvas.width / 2, canvas.height / 2, 0,
-                canvas.width / 2, canvas.height / 2, canvas.width / 2
-            );
-            gradient.addColorStop(0, 'rgba(255,255,255,1)');
-            gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-            gradient.addColorStop(0.5, 'rgba(255,255,255,0.1)');
-            gradient.addColorStop(1, 'rgba(255,255,255,0)');
-
-            context.fillStyle = gradient;
-            context.fillRect(0, 0, canvas.width, canvas.height);
-
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        function createStars(count, size, color, range) {
-            const geometry = new THREE.BufferGeometry();
-            const positions = [];
-            for (let i = 0; i < count; i++) {
-                positions.push(
-                    (Math.random() - 0.5) * range * 2,
-                    (Math.random() - 0.5) * range * 2,
-                    (Math.random() - 0.5) * range * 2
-                );
-            }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            
-            const pointTexture = createSoftCircleTexture();
-            
-            const material = new THREE.PointsMaterial({
-                size: size,
-                color: color,
-                sizeAttenuation: true,
-                map: pointTexture,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            });
-            return new THREE.Points(geometry, material);
-        }
-
-        function createNebulas(count, size) {
-            const geometry = new THREE.BufferGeometry();
-            const positions = [];
-            const colors = [];
-            const nebulaColors = [new THREE.Color(0xff00ff), new THREE.Color(0x00ffff), new THREE.Color(0xffa500)];
-            for (let i = 0; i < count; i++) {
-                positions.push(
-                    (Math.random() - 0.5) * 1500,
-                    (Math.random() - 0.5) * 500,
-                    (Math.random() - 0.5) * 1500
-                );
-                const color = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
-                colors.push(color.r, color.g, color.b);
-            }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-            const pointTexture = createSoftCircleTexture();
-
-            const material = new THREE.PointsMaterial({
-                size: size,
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.2,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                map: pointTexture
-            });
-            return new THREE.Points(geometry, material);
-        }
-
-        function createSlider(id, label, min, max, value, step = '') {
-            return `
-                <div class="control-row" id="row-${id}">
-                    <label for="${id}">${label}</label>
-                    <input type="range" id="${id}" min="${min}" max="${max}" value="${value}" ${step ? `step="${step}"` : ''}>
-                    <span>${value}</span>
-                </div>`;
-        }
-        function createColorPicker(id, label, value) {
-            return `
-                 <div class="control-row" id="row-${id}">
-                    <label for="${id}">${label}</label>
-                    <div></div>
-                    <input type="color" id="${id}" value="${value}">
-                </div>
-            `;
-        }
-
-        function addSliderListeners(config, recreateCallback) {
-            document.querySelectorAll('#scene-controls-container input[type="range"]').forEach(slider => {
-                const needsRecreate = slider.id === 'starCount' || slider.id === 'nebulaCount' || slider.id === 'blobCount';
-                slider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
-                    config[e.target.id] = value;
-                    e.target.nextElementSibling.textContent = value;
-                    if (slider.id === 'threshold' && lavaLamp.objects.material) {
-                         lavaLamp.objects.material.uniforms.u_threshold.value = value;
-                    }
-                });
-                if (needsRecreate) {
-                    slider.addEventListener('change', recreateCallback);
-                }
-            });
-        }
-        function addColorListeners(config, updateCallback) {
-             document.querySelectorAll('#scene-controls-container input[type="color"]').forEach(picker => {
-                picker.addEventListener('input', (e) => {
-                    config[e.target.id] = e.target.value;
-                    if (updateCallback) {
-                        updateCallback(e.target.id, e.target.value);
-                    }
-                });
-            });
-        }
+        // --- THIS IS THE PART YOUR SERVER WOULD GENERATE ---
+        // In a real application, this array would be created by your server
+        // reading the /scenes/ directory. To add a new scene, add its filename here.
+        const sceneFiles = ['deepSpace.js', 'lavaLamp.js'];
+        // ----------------------------------------------------
 
         // --- Main Logic ---
 
-        function init() {
+        async function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
             camera.position.z = 1;
 
             renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-
-            const scenes = { deepSpace, lavaLamp };
             
-            function switchScene(sceneName) {
-                if (activeSceneUpdater) {
-                    activeSceneUpdater.destroy(scene);
-                }
-                camera.position.set(0,0,1); // Reset camera for new scene
-                camera.rotation.set(0,0,0);
-                scene.rotation.set(0,0,0);
+            await loadScenesAndBuildUI();
 
-                activeSceneUpdater = scenes[sceneName];
-                
-                // Update text content based on scene
-                document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
-                 document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
-                    ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
-                    : 'Watch the mesmerizing fluid dynamics. Use the controls to change the flow.';
-                
-                activeSceneUpdater.init(scene);
-                activeSceneUpdater.createControls();
-
-                // Update UI
-                document.querySelectorAll('.scene-btn').forEach(btn => btn.classList.remove('active'));
-                document.querySelector(`.scene-btn[data-scene="${sceneName}"]`).classList.add('active');
-                document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
+            // Set the first scene as the default
+            if (sceneFiles.length > 0) {
+                const firstSceneName = sceneFiles[0].replace('.js', '');
+                switchScene(firstSceneName);
+            } else {
+                 document.getElementById('page-title').textContent = "No Scenes Found";
+                 document.getElementById('page-subtitle').textContent = "Add scene files to the '/scenes/' directory.";
             }
 
-            document.querySelectorAll('.scene-btn[data-scene]').forEach(btn => {
-                btn.addEventListener('click', () => switchScene(btn.dataset.scene));
-            });
-
-            switchScene('deepSpace'); // Initial scene
-
+            // --- Event Listeners ---
             window.addEventListener('resize', onWindowResize);
             window.addEventListener('mousemove', onMouseMove);
-
+            
             document.getElementById('toggleContentBtn').addEventListener('click', () => {
                 document.querySelector('.content').classList.toggle('hidden');
             });
-
+            
             // Hide/Show Controls Panel
             const controlsPanel = document.getElementById('controls');
             const hideControlsBtn = document.getElementById('hideControlsBtn');
@@ -709,16 +307,65 @@
             hideSelectorBtn.addEventListener('click', () => { selectorPanel.classList.add('hidden'); showSelectorBtn.classList.add('visible'); });
             showSelectorBtn.addEventListener('click', () => { selectorPanel.classList.remove('hidden'); showSelectorBtn.classList.remove('visible'); });
             
-            // Generate/Copy code (simplified for now)
             document.getElementById('generateCodeBtn').addEventListener('click', () => { alert('Code generation for this scene is not yet implemented.'); });
+        }
+
+        async function loadScenesAndBuildUI() {
+            const container = document.getElementById('scene-buttons-container');
+            
+            for (const fileName of sceneFiles) {
+                const sceneName = fileName.replace('.js', '');
+                try {
+                    // Dynamically import the scene module from the 'scenes' directory
+                    const module = await import(`./scenes/${fileName}`);
+                    
+                    // Assumes the exported object has the same name as the scene (e.g., deepSpace)
+                    if (module[sceneName]) {
+                        loadedScenes[sceneName] = module[sceneName];
+                        
+                        // Create a button for the scene selector
+                        const btn = document.createElement('button');
+                        btn.className = 'scene-btn';
+                        btn.dataset.scene = sceneName;
+                        btn.textContent = module[sceneName].title || sceneName; // Use title from scene object
+                        btn.onclick = () => switchScene(sceneName);
+                        container.appendChild(btn);
+                    }
+                } catch (error) {
+                    console.error(`Failed to load scene: ${fileName}`, error);
+                }
+            }
+        }
+
+        function switchScene(sceneName) {
+            if (activeSceneUpdater) {
+                activeSceneUpdater.destroy(scene);
+            }
+            camera.position.set(0,0,1);
+            camera.rotation.set(0,0,0);
+            scene.rotation.set(0,0,0);
+
+            activeSceneUpdater = loadedScenes[sceneName];
+            
+            document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
+            document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
+                ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
+                : 'Watch the mesmerizing fluid dynamics. Use the controls to change the flow.';
+            
+            activeSceneUpdater.init(scene);
+            activeSceneUpdater.createControls(scene);
+
+            document.querySelectorAll('.scene-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.scene-btn[data-scene="${sceneName}"]`).classList.add('active');
+            document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
         }
 
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            if (activeSceneUpdater === lavaLamp) {
-                lavaLamp.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+            if (activeSceneUpdater === loadedScenes.lavaLamp) {
+                loadedScenes.lavaLamp.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
             }
         }
 
@@ -730,7 +377,7 @@
         function animate() {
             requestAnimationFrame(animate);
             if (activeSceneUpdater) {
-                activeSceneUpdater.update(clock);
+                activeSceneUpdater.update(clock, mouse, camera);
             }
             renderer.render(scene, camera);
         }
@@ -749,5 +396,3 @@
 </script>
 </body>
 </html>
-
-
