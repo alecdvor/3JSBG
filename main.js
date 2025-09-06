@@ -8,7 +8,7 @@ const clock = new THREE.Clock();
 const loadedScenes = {};
 const defaultConfigs = {}; // Store default configs for comparison
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js'];
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js']; // add new scenes in the scenes directory to this line to expose it to the scene selector.
 
 async function init() {
     scene = new THREE.Scene();
