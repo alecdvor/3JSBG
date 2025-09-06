@@ -10,8 +10,8 @@ export const smokeyLights = {
         particleSize: 4.5,
         particleSpeed: 0.05,
         noiseStrength: 0.1,
-        mouseRepelRadius: 4,
-        mouseRepelStrength: 0.2,
+        mouseInfluenceRadius: 3,
+        mousePushStrength: 0.2,
         light1Color: '#ff4081',
         light1Intensity: 1.5,
         light2Color: '#3f51b5',
@@ -59,21 +59,25 @@ export const smokeyLights = {
         this.objects.color1 = new THREE.Color(this.config.light1Color);
         this.objects.color2 = new THREE.Color(this.config.light2Color);
         
-        // Vector for storing the mouse's 3D position
+        // Vectors for tracking mouse movement
         this.objects.mousePosition3D = new THREE.Vector3();
+        this.objects.lastMousePosition = new THREE.Vector2();
+        this.objects.mouseVelocity = new THREE.Vector2();
     },
 
     update(clock, mouse, camera) {
         const elapsedTime = clock.getElapsedTime();
 
-        // --- Mouse Position Calculation ---
+        // --- Calculate Mouse Velocity ---
+        this.objects.mouseVelocity.subVectors(mouse, this.objects.lastMousePosition);
+        this.objects.lastMousePosition.copy(mouse);
+
         // Project the 2D mouse position into the 3D scene
         this.objects.mousePosition3D.set(mouse.x, mouse.y, 0.5);
         this.objects.mousePosition3D.unproject(camera);
         this.objects.mousePosition3D.sub(camera.position).normalize();
         const distance = -camera.position.z / this.objects.mousePosition3D.z;
         this.objects.mousePosition3D.multiplyScalar(distance).add(camera.position);
-
 
         // Animate Light Positions
         this.objects.light1.position.set(
@@ -93,30 +97,25 @@ export const smokeyLights = {
         
         const tempColor = new THREE.Color();
         const particlePosition = new THREE.Vector3();
-        const repelDirection = new THREE.Vector3();
 
         for (let i = 0; i < this.config.particleCount; i++) {
             const i3 = i * 3;
             particlePosition.set(positions[i3], positions[i3 + 1], positions[i3 + 2]);
 
-            // --- Mouse Repel Logic ---
-            const repelDist = particlePosition.distanceTo(this.objects.mousePosition3D);
-            if (repelDist < this.config.mouseRepelRadius) {
-                // Calculate the push force
-                const repelForce = (1 - repelDist / this.config.mouseRepelRadius) * this.config.mouseRepelStrength;
-                repelDirection.subVectors(particlePosition, this.objects.mousePosition3D).normalize();
-                
-                // Apply the force directly to the particle's position
-                positions[i3] += repelDirection.x * repelForce;
-                positions[i3 + 1] += repelDirection.y * repelForce;
-                positions[i3 + 2] += repelDirection.z * repelForce;
+            // --- Mouse Push Logic ---
+            const pushDist = particlePosition.distanceTo(this.objects.mousePosition3D);
+            if (pushDist < this.config.mouseInfluenceRadius) {
+                // Apply the mouse's velocity to the particle's velocity
+                const pushForce = (1 - pushDist / this.config.mouseInfluenceRadius) * this.config.mousePushStrength;
+                velocities[i3] += this.objects.mouseVelocity.x * pushForce;
+                velocities[i3 + 1] += this.objects.mouseVelocity.y * pushForce;
             }
 
-            // Update position
+            // Update position based on velocity
             positions[i3] += velocities[i3] * this.config.particleSpeed;
             positions[i3 + 1] += velocities[i3 + 1] * this.config.particleSpeed;
             positions[i3 + 2] += velocities[i3 + 2] * this.config.particleSpeed;
-
+            
             // Add noise
             positions[i3] += (Math.random() - 0.5) * this.config.noiseStrength;
             positions[i3 + 2] += (Math.random() - 0.5) * this.config.noiseStrength;
@@ -134,7 +133,7 @@ export const smokeyLights = {
             const influence1 = (1 / dist1Sq) * this.config.light1Intensity;
             const influence2 = (1 / dist2Sq) * this.config.light2Intensity;
             const totalInfluence = influence1 + influence2;
-            const mixRatio = influence1 / totalInfluence;
+            const mixRatio = totalInfluence > 0 ? influence1 / totalInfluence : 0;
 
             tempColor.lerpColors(this.objects.color2, this.objects.color1, mixRatio);
             tempColor.multiplyScalar(totalInfluence);
@@ -145,6 +144,7 @@ export const smokeyLights = {
         }
         
         this.objects.particleGeometry.attributes.position.needsUpdate = true;
+        this.objects.particleGeometry.attributes.velocity.needsUpdate = true;
         this.objects.particleGeometry.attributes.color.needsUpdate = true;
     },
 
@@ -166,8 +166,8 @@ export const smokeyLights = {
             ${createSlider('particleSpeed', 'Speed', 0.01, 0.5, this.config.particleSpeed, '0.01')}
             ${createSlider('noiseStrength', 'Noise', 0, 0.5, this.config.noiseStrength, '0.01')}
             <h3>Mouse Interaction</h3>
-            ${createSlider('mouseRepelRadius', 'Radius', 0, 10, this.config.mouseRepelRadius, '0.1')}
-            ${createSlider('mouseRepelStrength', 'Strength', 0, 1, this.config.mouseRepelStrength, '0.01')}
+            ${createSlider('mouseInfluenceRadius', 'Radius', 0, 10, this.config.mouseInfluenceRadius, '0.1')}
+            ${createSlider('mousePushStrength', 'Strength', 0, 1, this.config.mousePushStrength, '0.01')}
             <h3>Light 1</h3>
             ${createSlider('light1Intensity', 'Intensity', 0, 5, this.config.light1Intensity, '0.1')}
             ${createColorPicker('light1Color', 'Color', this.config.light1Color)}
