@@ -459,17 +459,13 @@
         function generateEmbedCode() {
             if (!activeSceneUpdater) return;
 
-            const defaultConfig = defaultConfigs[activeSceneName];
+            // Get the complete current configuration object.
             const currentConfig = activeSceneUpdater.config;
-            const customConfig = {};
-
-            for (const key in currentConfig) {
-                if (JSON.stringify(currentConfig[key]) !== JSON.stringify(defaultConfig[key])) {
-                    customConfig[key] = currentConfig[key];
-                }
-            }
             
-            const configString = Object.keys(customConfig).length > 0 ? `\n  config: ${JSON.stringify(customConfig, null, 2)}\n` : '';
+            // The config string now includes all properties, not just customized ones.
+            const configString = Object.keys(currentConfig).length > 0 
+                ? `\n  config: ${JSON.stringify(currentConfig, null, 2)}\n` 
+                : '';
 
             const embedCode = `<div id="my-background"></div>
 
@@ -505,7 +501,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            if (activeSceneUpdater.onWindowResize) { // Check if scene has this method
+            if (activeSceneUpdater && activeSceneUpdater.onWindowResize) { // Check if scene has this method
                 activeSceneUpdater.onWindowResize(window.innerWidth, window.innerHeight);
             }
         }
