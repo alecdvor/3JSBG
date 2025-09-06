@@ -1,4 +1,4 @@
-import * as THREE from 'three'; 
+import * as THREE from 'three';
 
 function createSoftCircleTexture() {
     const canvas = document.createElement('canvas');
