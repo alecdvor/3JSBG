@@ -121,6 +121,4 @@ function addColorListeners(config, updateCallback) {
         });
     });
 }
-
-
 export { createSoftCircleTexture, createStars, createNebulas, createSlider, createColorPicker, addSliderListeners, addColorListeners };
