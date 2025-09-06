@@ -10,6 +10,8 @@ export const smokeyLights = {
         particleSize: 4.5,
         particleSpeed: 0.05,
         noiseStrength: 0.1,
+        mouseRepelRadius: 4,
+        mouseRepelStrength: 0.2,
         light1Color: '#ff4081',
         light1Intensity: 1.5,
         light2Color: '#3f51b5',
@@ -56,11 +58,24 @@ export const smokeyLights = {
         this.objects.light2 = new THREE.Object3D();
         this.objects.color1 = new THREE.Color(this.config.light1Color);
         this.objects.color2 = new THREE.Color(this.config.light2Color);
+        
+        // Vector for storing the mouse's 3D position
+        this.objects.mousePosition3D = new THREE.Vector3();
     },
 
-    update(clock) {
+    update(clock, mouse, camera) {
         const elapsedTime = clock.getElapsedTime();
 
+        // --- Mouse Position Calculation ---
+        // Project the 2D mouse position into the 3D scene
+        this.objects.mousePosition3D.set(mouse.x, mouse.y, 0.5);
+        this.objects.mousePosition3D.unproject(camera);
+        this.objects.mousePosition3D.sub(camera.position).normalize();
+        const distance = -camera.position.z / this.objects.mousePosition3D.z;
+        this.objects.mousePosition3D.multiplyScalar(distance).add(camera.position);
+
+
+        // Animate Light Positions
         this.objects.light1.position.set(
             Math.sin(elapsedTime * 0.6) * 7,
             Math.cos(elapsedTime * 0.4) * 4,
@@ -75,43 +90,53 @@ export const smokeyLights = {
         const positions = this.objects.particleGeometry.attributes.position.array;
         const velocities = this.objects.particleGeometry.attributes.velocity.array;
         const colors = this.objects.particleGeometry.attributes.color.array;
-        const noise = this.config.noiseStrength;
         
         const tempColor = new THREE.Color();
         const particlePosition = new THREE.Vector3();
+        const repelDirection = new THREE.Vector3();
 
         for (let i = 0; i < this.config.particleCount; i++) {
             const i3 = i * 3;
+            particlePosition.set(positions[i3], positions[i3 + 1], positions[i3 + 2]);
 
+            // --- Mouse Repel Logic ---
+            const repelDist = particlePosition.distanceTo(this.objects.mousePosition3D);
+            if (repelDist < this.config.mouseRepelRadius) {
+                // Calculate the push force
+                const repelForce = (1 - repelDist / this.config.mouseRepelRadius) * this.config.mouseRepelStrength;
+                repelDirection.subVectors(particlePosition, this.objects.mousePosition3D).normalize();
+                
+                // Apply the force directly to the particle's position
+                positions[i3] += repelDirection.x * repelForce;
+                positions[i3 + 1] += repelDirection.y * repelForce;
+                positions[i3 + 2] += repelDirection.z * repelForce;
+            }
+
+            // Update position
             positions[i3] += velocities[i3] * this.config.particleSpeed;
             positions[i3 + 1] += velocities[i3 + 1] * this.config.particleSpeed;
             positions[i3 + 2] += velocities[i3 + 2] * this.config.particleSpeed;
 
-            positions[i3] += (Math.random() - 0.5) * noise;
-            positions[i3 + 2] += (Math.random() - 0.5) * noise;
+            // Add noise
+            positions[i3] += (Math.random() - 0.5) * this.config.noiseStrength;
+            positions[i3 + 2] += (Math.random() - 0.5) * this.config.noiseStrength;
 
+            // Reset particle
             if (positions[i3 + 1] > 10) {
                 positions[i3] = (Math.random() - 0.5) * 20;
                 positions[i3 + 1] = -5;
                 positions[i3 + 2] = (Math.random() - 0.5) * 10;
             }
 
-            // --- CORRECTED Color Calculation ---
-            particlePosition.set(positions[i3], positions[i3 + 1], positions[i3 + 2]);
-            
+            // --- Color Calculation ---
             const dist1Sq = Math.max(1, particlePosition.distanceToSquared(this.objects.light1.position));
             const dist2Sq = Math.max(1, particlePosition.distanceToSquared(this.objects.light2.position));
-
             const influence1 = (1 / dist1Sq) * this.config.light1Intensity;
             const influence2 = (1 / dist2Sq) * this.config.light2Intensity;
             const totalInfluence = influence1 + influence2;
-
             const mixRatio = influence1 / totalInfluence;
 
-            // Use .lerpColors to mix between the two light colors based on proximity
             tempColor.lerpColors(this.objects.color2, this.objects.color1, mixRatio);
-            
-            // Apply the combined intensity
             tempColor.multiplyScalar(totalInfluence);
             
             colors[i3] = tempColor.r;
@@ -140,6 +165,9 @@ export const smokeyLights = {
             ${createSlider('particleSize', 'Size', 0.5, 15, this.config.particleSize, '0.1')}
             ${createSlider('particleSpeed', 'Speed', 0.01, 0.5, this.config.particleSpeed, '0.01')}
             ${createSlider('noiseStrength', 'Noise', 0, 0.5, this.config.noiseStrength, '0.01')}
+            <h3>Mouse Interaction</h3>
+            ${createSlider('mouseRepelRadius', 'Radius', 0, 10, this.config.mouseRepelRadius, '0.1')}
+            ${createSlider('mouseRepelStrength', 'Strength', 0, 1, this.config.mouseRepelStrength, '0.01')}
             <h3>Light 1</h3>
             ${createSlider('light1Intensity', 'Intensity', 0, 5, this.config.light1Intensity, '0.1')}
             ${createColorPicker('light1Color', 'Color', this.config.light1Color)}
