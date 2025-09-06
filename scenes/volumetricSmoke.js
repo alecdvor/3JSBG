@@ -105,6 +105,10 @@ export const volumetricSmoke = {
                 }
             `,
             fragmentShader: `
+                // --- FIX: Added precision declarations ---
+                precision mediump float;
+                precision highp sampler3D;
+
                 varying vec3 vWorldPosition;
                 uniform float uTime;
                 uniform float uDensity;
@@ -209,7 +213,9 @@ export const volumetricSmoke = {
         ['density', 'noiseScale', 'noiseSpeed', 'light1Intensity', 'light2Intensity'].forEach(id => {
             document.getElementById(id).addEventListener('input', (e) => {
                 const uniformName = `u${id.charAt(0).toUpperCase() + id.slice(1)}`;
-                this.objects.material.uniforms[uniformName].value = parseFloat(e.target.value);
+                if (this.objects.material.uniforms[uniformName]) {
+                    this.objects.material.uniforms[uniformName].value = parseFloat(e.target.value);
+                }
             });
         });
     }
