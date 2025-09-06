@@ -1,34 +1,33 @@
-/*
- * =====================================================================================
- * SCENE: Smokey Lights
- * =====================================================================================
- *
- * A customizable background of drifting smoke illuminated by two colored lights.
- * This scene uses a particle system for an efficient, animated smoke effect.
- *
- * =====================================================================================
- */
-
-// Import the Three.js library.
 import * as THREE from 'three';
+// Import the helper functions for UI creation, as seen in lavaLamp.js
+import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 /**
- * @exports smokeyLights
- *
- * The main scene object. The name of this exported constant MUST match the filename.
+ * Creates a procedural, soft, circular texture for the smoke particles.
+ * @returns {THREE.CanvasTexture} A texture object.
  */
-export const smokeyLights = {
+function createSmokeTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
 
-    /**
-     * @property {string} title
-     * The display name for the scene, which appears in the UI.
-     */
-    title: "Smokey Lights",
+    const gradient = context.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, 0,
+        canvas.width / 2, canvas.height / 2, canvas.width / 2
+    );
 
-    /**
-     * @property {object} config
-     * Holds all customizable parameters for the scene, with default values.
-     */
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    return new THREE.CanvasTexture(canvas);
+}
+
+const smokeyLights = {
+    // Scene configuration object
     config: {
         particleCount: 700,
         particleSize: 3.5,
@@ -39,87 +38,33 @@ export const smokeyLights = {
         light2Intensity: 300,
     },
 
-    /**
-     * @property {object} objects
-     * A container for Three.js objects that need to be accessed across different functions.
-     */
-    objects: {
-        smokeParticles: null,
-        light1: null,
-        light2: null,
-        particleMaterial: null,
-        particleGeometry: null,
-        smokeTexture: null,
-    },
+    // Container for THREE.js objects
+    objects: {},
 
-    /**
-     * @property {THREE.Scene | null} scene
-     * A reference to the main Three.js scene object, populated by `init`.
-     */
-    scene: null,
-
-    /**
-     * @private
-     * @method _createSmokeTexture
-     * Generates a procedural, soft, circular texture for the smoke particles.
-     * This avoids the need for external image files.
-     * @returns {THREE.CanvasTexture} A texture object.
-     */
-    _createSmokeTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const context = canvas.getContext('2d');
-
-        const gradient = context.createRadialGradient(
-            canvas.width / 2, canvas.height / 2, 0,
-            canvas.width / 2, canvas.height / 2, canvas.width / 2
-        );
-
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        context.fillStyle = gradient;
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        this.objects.smokeTexture = new THREE.CanvasTexture(canvas);
-        return this.objects.smokeTexture;
-    },
-
-
-    /**
-     * @method init
-     * Sets up the initial scene objects (particles and lights).
-     * @param {THREE.Scene} scene - The main Three.js scene.
-     */
-    init(scene) {
-        this.scene = scene;
-        this.scene.fog = new THREE.Fog(0x000000, 1, 25);
+    // Initialize the scene
+    init: function(scene) {
+        scene.fog = new THREE.Fog(0x000000, 1, 25);
 
         // --- Create Smoke Particles ---
         const particleCount = this.config.particleCount;
         this.objects.particleGeometry = new THREE.BufferGeometry();
         const positions = new Float32Array(particleCount * 3);
-        const velocities = new Float32Array(particleCount * 3); // Store y-velocity and x/z sway factors
+        const velocities = new Float32Array(particleCount * 3);
 
         for (let i = 0; i < particleCount; i++) {
-            // Position
-            positions[i * 3] = (Math.random() - 0.5) * 20; // x
-            positions[i * 3 + 1] = Math.random() * 10;      // y
+            positions[i * 3] = (Math.random() - 0.5) * 20;      // x
+            positions[i * 3 + 1] = Math.random() * 10 - 5;      // y
             positions[i * 3 + 2] = (Math.random() - 0.5) * 10 - 5; // z
-
-            // Velocity (y-speed, x-sway frequency, z-sway frequency)
-            velocities[i * 3] = (Math.random() * 0.5 + 0.5) * this.config.particleSpeed;
-            velocities[i * 3 + 1] = Math.random() * 2;
-            velocities[i * 3 + 2] = Math.random() * 2;
+            velocities[i * 3] = (Math.random() * 0.5 + 0.5); // base upward speed factor
         }
 
         this.objects.particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         this.objects.particleGeometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
 
+        this.objects.smokeTexture = createSmokeTexture();
         this.objects.particleMaterial = new THREE.PointsMaterial({
             size: this.config.particleSize,
-            map: this._createSmokeTexture(),
+            map: this.objects.smokeTexture,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             transparent: true,
@@ -127,44 +72,18 @@ export const smokeyLights = {
         });
 
         this.objects.smokeParticles = new THREE.Points(this.objects.particleGeometry, this.objects.particleMaterial);
-        this.scene.add(this.objects.smokeParticles);
+        scene.add(this.objects.smokeParticles);
 
         // --- Create Lights ---
         this.objects.light1 = new THREE.PointLight(this.config.light1Color, this.config.light1Intensity, 30, 2);
-        this.scene.add(this.objects.light1);
+        scene.add(this.objects.light1);
 
         this.objects.light2 = new THREE.PointLight(this.config.light2Color, this.config.light2Intensity, 30, 2);
-        this.scene.add(this.objects.light2);
+        scene.add(this.objects.light2);
     },
 
-    /**
-     * @method destroy
-     * Cleans up scene objects to prevent memory leaks.
-     */
-    destroy() {
-        if (!this.scene) return;
-
-        // Dispose of geometries, materials, and textures
-        this.objects.particleGeometry?.dispose();
-        this.objects.particleMaterial?.dispose();
-        this.objects.smokeTexture?.dispose();
-
-        // Remove all objects from the scene
-        this.scene.remove(this.objects.smokeParticles);
-        this.scene.remove(this.objects.light1);
-        this.scene.remove(this.objects.light2);
-        this.scene.fog = null;
-
-        // Clear the objects container
-        this.objects = {};
-    },
-
-    /**
-     * @method update
-     * The animation loop, called on every frame.
-     * @param {THREE.Clock} clock - Provides time information.
-     */
-    update(clock) {
+    // Update loop for animations
+    update: function(clock, mouse) {
         const elapsedTime = clock.getElapsedTime();
 
         // Animate Lights
@@ -187,15 +106,8 @@ export const smokeyLights = {
 
             for (let i = 0; i < this.config.particleCount; i++) {
                 const i3 = i * 3;
-                // Update Y position
-                positions[i3 + 1] += velocities[i3]; // Use stored upward velocity
+                positions[i3 + 1] += velocities[i3] * this.config.particleSpeed * 0.1;
 
-                // Add gentle horizontal sway
-                positions[i3] += Math.sin(elapsedTime * velocities[i3 + 1]) * 0.01;
-                positions[i3 + 2] += Math.cos(elapsedTime * velocities[i3 + 2]) * 0.01;
-
-
-                // If particle goes above the view, reset it to the bottom
                 if (positions[i3 + 1] > 10) {
                     positions[i3 + 1] = -5;
                 }
@@ -204,115 +116,59 @@ export const smokeyLights = {
         }
     },
 
-    /**
-     * @method createControls
-     * Generates the HTML controls for the scene's `config` parameters.
-     */
-    createControls() {
-        const container = document.getElementById('scene-controls-container');
+    // Clean up the scene
+    destroy: function(scene) {
+        if (!scene || !this.objects.smokeParticles) return;
 
+        scene.remove(this.objects.smokeParticles);
+        scene.remove(this.objects.light1);
+        scene.remove(this.objects.light2);
+        scene.fog = null;
+
+        this.objects.particleGeometry?.dispose();
+        this.objects.particleMaterial?.dispose();
+        this.objects.smokeTexture?.dispose();
+
+        this.objects = {};
+    },
+
+    // Create UI controls
+    createControls: function(scene) {
+        const container = document.getElementById('scene-controls-container');
         container.innerHTML = `
             <div class="control-section">
                 <h3>Smoke</h3>
-                <div class="control-row">
-                    <label for="particleSize">Size</label>
-                    <input type="range" id="particleSize" min="0.5" max="10" step="0.1" value="${this.config.particleSize}">
-                    <span class="value-label">${this.config.particleSize}</span>
-                </div>
-                <div class="control-row">
-                    <label for="particleSpeed">Speed</label>
-                    <input type="range" id="particleSpeed" min="0.01" max="1" step="0.01" value="${this.config.particleSpeed}">
-                    <span class="value-label">${this.config.particleSpeed}</span>
-                </div>
+                ${createSlider('particleCount', 'Count', 100, 2000, this.config.particleCount, 50)}
+                ${createSlider('particleSize', 'Size', 0.5, 10, this.config.particleSize, 0.1)}
+                ${createSlider('particleSpeed', 'Speed', 0.01, 1, this.config.particleSpeed, 0.01)}
             </div>
-
             <div class="control-section">
                 <h3>Light 1</h3>
-                <div class="control-row">
-                    <label for="light1Intensity">Intensity</label>
-                    <input type="range" id="light1Intensity" min="0" max="1000" step="10" value="${this.config.light1Intensity}">
-                    <span class="value-label">${this.config.light1Intensity}</span>
-                </div>
-                <div class="control-row">
-                    <label for="light1Color">Color</label>
-                    <input type="color" id="light1Color" value="${this.config.light1Color}">
-                </div>
+                ${createSlider('light1Intensity', 'Intensity', 0, 1000, this.config.light1Intensity, 10)}
+                ${createColorPicker('light1Color', 'Color', this.config.light1Color)}
             </div>
-
             <div class="control-section">
                 <h3>Light 2</h3>
-                 <div class="control-row">
-                    <label for="light2Intensity">Intensity</label>
-                    <input type="range" id="light2Intensity" min="0" max="1000" step="10" value="${this.config.light2Intensity}">
-                    <span class="value-label">${this.config.light2Intensity}</span>
-                </div>
-                <div class="control-row">
-                    <label for="light2Color">Color</label>
-                    <input type="color" id="light2Color" value="${this.config.light2Color}">
-                </div>
+                ${createSlider('light2Intensity', 'Intensity', 0, 1000, this.config.light2Intensity, 10)}
+                ${createColorPicker('light2Color', 'Color', this.config.light2Color)}
             </div>
         `;
 
-        // --- Event Listeners ---
-
-        // Particle Size
-        document.getElementById('particleSize').addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            this.config.particleSize = value;
-            if (this.objects.particleMaterial) {
-                this.objects.particleMaterial.size = value;
-            }
-            e.target.nextElementSibling.textContent = value.toFixed(1);
+        // Add listeners for sliders. Note: Changing count requires a full scene reset.
+        addSliderListeners(this.config, () => {
+            this.destroy(scene);
+            this.init(scene);
         });
 
-        // Particle Speed
-        document.getElementById('particleSpeed').addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            this.config.particleSpeed = value;
-            // Update the base speed for all particles
-            const velocities = this.objects.particleGeometry.attributes.velocity.array;
-            for (let i = 0; i < this.config.particleCount; i++) {
-                 // Recalculate based on original randomness, preserving variation
-                 const originalRandomness = velocities[i*3] / (this.config.particleSpeed / value); // Estimate original random factor
-                 velocities[i*3] = (originalRandomness) * value;
-            }
-            e.target.nextElementSibling.textContent = value.toFixed(2);
-        });
-
-        // Light 1 Intensity
-        document.getElementById('light1Intensity').addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            this.config.light1Intensity = value;
-            if (this.objects.light1) {
-                this.objects.light1.intensity = value;
-            }
-            e.target.nextElementSibling.textContent = value;
-        });
-
-        // Light 1 Color
-        document.getElementById('light1Color').addEventListener('input', (e) => {
-            this.config.light1Color = e.target.value;
-            if (this.objects.light1) {
-                this.objects.light1.color.set(e.target.value);
-            }
-        });
-
-        // Light 2 Intensity
-        document.getElementById('light2Intensity').addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            this.config.light2Intensity = value;
-            if (this.objects.light2) {
-                this.objects.light2.intensity = value;
-            }
-            e.target.nextElementSibling.textContent = value;
-        });
-
-        // Light 2 Color
-        document.getElementById('light2Color').addEventListener('input', (e) => {
-            this.config.light2Color = e.target.value;
-            if (this.objects.light2) {
-                this.objects.light2.color.set(e.target.value);
+        // Add listeners for color pickers, which can update the scene directly.
+        addColorListeners(this.config, (key, value) => {
+            if (key === 'light1Color' && this.objects.light1) {
+                this.objects.light1.color.set(value);
+            } else if (key === 'light2Color' && this.objects.light2) {
+                this.objects.light2.color.set(value);
             }
         });
     }
 };
+
+export { smokeyLights };
