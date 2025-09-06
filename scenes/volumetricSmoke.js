@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 // --- ImprovedNoise Utility (from Three.js examples) ---
-// This is needed to generate the 3D noise texture on the CPU.
 class ImprovedNoise {
     constructor() {
         const p = new Uint8Array(512);
@@ -48,6 +47,7 @@ export const volumetricSmoke = {
         density: 1.2,
         noiseScale: 2.5,
         noiseSpeed: 0.1,
+        lightSpeed: 0.5, // New property for light speed
         light1Color: '#ff80ab',
         light1Intensity: 2.0,
         light2Color: '#80d8ff',
@@ -59,7 +59,6 @@ export const volumetricSmoke = {
     init(scene) {
         this.scene = scene;
 
-        // --- Create 3D Noise Texture ---
         const size = 64;
         const data = new Uint8Array(size * size * size);
         const perlin = new ImprovedNoise();
@@ -79,7 +78,6 @@ export const volumetricSmoke = {
         this.objects.noiseTexture.unpackAlignment = 1;
         this.objects.noiseTexture.needsUpdate = true;
 
-        // --- Create Volumetric Mesh and Shader Material ---
         const geometry = new THREE.BoxGeometry(10, 10, 10);
         this.objects.material = new THREE.ShaderMaterial({
             side: THREE.BackSide,
@@ -105,10 +103,8 @@ export const volumetricSmoke = {
                 }
             `,
             fragmentShader: `
-                // --- FIX: Added precision declarations ---
                 precision mediump float;
                 precision highp sampler3D;
-
                 varying vec3 vWorldPosition;
                 uniform float uTime;
                 uniform float uDensity;
@@ -129,22 +125,16 @@ export const volumetricSmoke = {
                 void main() {
                     vec3 rayDir = normalize(vWorldPosition - cameraPosition);
                     vec3 rayPos = cameraPosition;
-                    float totalLight = 0.0;
                     vec3 accumulatedColor = vec3(0.0);
-
                     for (int i = 0; i < 32; i++) {
-                        rayPos += rayDir * 0.2; // Step through the volume
-                        
+                        rayPos += rayDir * 0.2;
                         float noise = getNoise(rayPos);
                         float density = smoothstep(0.4, 0.6, noise) * uDensity;
-
                         if (density > 0.01) {
                             float dist1 = max(0.1, distance(rayPos, uLight1Pos));
                             float dist2 = max(0.1, distance(rayPos, uLight2Pos));
-                            
                             vec3 light1 = (uLight1Color * uLight1Intensity) / (dist1 * dist1);
                             vec3 light2 = (uLight2Color * uLight2Intensity) / (dist2 * dist2);
-                            
                             accumulatedColor += (light1 + light2) * density * 0.1;
                         }
                     }
@@ -156,14 +146,13 @@ export const volumetricSmoke = {
         this.objects.mesh = new THREE.Mesh(geometry, this.objects.material);
         this.scene.add(this.objects.mesh);
 
-        // Light position helpers
         this.objects.light1 = new THREE.Object3D();
         this.objects.light2 = new THREE.Object3D();
     },
 
     update(clock) {
-        const elapsedTime = clock.getElapsedTime();
-        this.objects.material.uniforms.uTime.value = elapsedTime;
+        const elapsedTime = clock.getElapsedTime() * this.config.lightSpeed; // Use the lightSpeed config
+        this.objects.material.uniforms.uTime.value = clock.getElapsedTime(); // Keep noise speed independent
 
         this.objects.light1.position.set(
             Math.sin(elapsedTime * 0.4) * 4,
@@ -194,22 +183,21 @@ export const volumetricSmoke = {
             <h3>Smoke</h3>
             ${createSlider('density', 'Density', 0.1, 5, this.config.density, '0.1')}
             ${createSlider('noiseScale', 'Scale', 0.1, 10, this.config.noiseScale, '0.1')}
-            ${createSlider('noiseSpeed', 'Speed', 0, 0.5, this.config.noiseSpeed, '0.01')}
-            <h3>Light 1</h3>
-            ${createSlider('light1Intensity', 'Intensity', 0, 10, this.config.light1Intensity, '0.1')}
-            ${createColorPicker('light1Color', 'Color', this.config.light1Color)}
-            <h3>Light 2</h3>
-            ${createSlider('light2Intensity', 'Intensity', 0, 10, this.config.light2Intensity, '0.1')}
-            ${createColorPicker('light2Color', 'Color', this.config.light2Color)}
+            ${createSlider('noiseSpeed', 'Noise Speed', 0, 0.5, this.config.noiseSpeed, '0.01')}
+            <h3>Lights</h3>
+            ${createSlider('lightSpeed', 'Light Speed', 0, 2, this.config.lightSpeed, '0.1')}
+            ${createSlider('light1Intensity', 'Light 1 Intensity', 0, 10, this.config.light1Intensity, '0.1')}
+            ${createColorPicker('light1Color', 'Light 1 Color', this.config.light1Color)}
+            ${createSlider('light2Intensity', 'Light 2 Intensity', 0, 10, this.config.light2Intensity, '0.1')}
+            ${createColorPicker('light2Color', 'Light 2 Color', this.config.light2Color)}
         `;
 
-        addSliderListeners(this.config, null); // No need for recreate callback
+        addSliderListeners(this.config, null);
         addColorListeners(this.config, (key, value) => {
             if (key === 'light1Color') this.objects.material.uniforms.uLight1Color.value.set(value);
             if (key === 'light2Color') this.objects.material.uniforms.uLight2Color.value.set(value);
         });
         
-        // Add direct listeners for uniform updates
         ['density', 'noiseScale', 'noiseSpeed', 'light1Intensity', 'light2Intensity'].forEach(id => {
             document.getElementById(id).addEventListener('input', (e) => {
                 const uniformName = `u${id.charAt(0).toUpperCase() + id.slice(1)}`;
