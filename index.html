@@ -22,6 +22,19 @@
             height: 100%;
             z-index: -1;
         }
+        #motion-prompt {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 1.5rem;
+            z-index: 200;
+            cursor: pointer;
+        }
         .content {
             position: absolute;
             top: 50%;
@@ -198,6 +211,10 @@
 <body>
     <canvas id="bg-canvas"></canvas>
 
+    <div id="motion-prompt">
+        <p>Tap to enable motion controls</p>
+    </div>
+
     <div class="content">
         <h1 id="page-title">Welcome to the Void</h1>
         <p id="page-subtitle">Move your mouse to explore the cosmos. Use the controls to customize your journey!</p>
@@ -253,7 +270,7 @@
 
         const deepSpace = {
             title: "Deep Space",
-            config: { starCount: 6000, starSize: 6.0, speedMultiplier: 1.0, nebulaCount: 50, nebulaSize: 350 },
+            config: { starCount: 6000, starSize: 6.0, speedMultiplier: 1.0, nebulaCount: 50, nebulaSize: 350, planetCount: 5, asteroidCount: 50 },
             objects: {}, // To hold stars, nebulas etc.
             
             init(scene) {
@@ -262,6 +279,9 @@
 
             update(clock) {
                 const elapsedTime = clock.getElapsedTime();
+                const delta = clock.getDelta();
+
+                // Star movement
                 if (this.objects.stars) {
                     const positions = this.objects.stars.geometry.attributes.position.array;
                     for (let i = 0; i < positions.length; i += 3) {
@@ -274,20 +294,44 @@
                 if (this.objects.nebulas) {
                     this.objects.nebulas.rotation.z = elapsedTime * 0.01;
                 }
-                camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
-                camera.position.y += (mouse.y * 0.5 - camera.position.y) * 0.02;
+
+                // Planet and Asteroid movement
+                ['planets', 'asteroids'].forEach(type => {
+                    if (this.objects[type]) {
+                        this.objects[type].children.forEach(obj => {
+                            obj.position.z += obj.userData.speedZ * this.config.speedMultiplier;
+                            obj.rotation.x += obj.userData.rotationSpeed.x * delta;
+                            obj.rotation.y += obj.userData.rotationSpeed.y * delta;
+                            if (obj.position.z > camera.position.z) {
+                                obj.position.z = -2500 - Math.random() * 500;
+                            }
+                        });
+                    }
+                });
+
+                camera.position.x += (mouse.x * 2 - camera.position.x) * 0.02;
+                camera.position.y += (mouse.y * 2 - camera.position.y) * 0.02;
                 camera.lookAt(scene.position);
             },
 
             destroy(scene) {
-                if (this.objects.stars) scene.remove(this.objects.stars);
-                if (this.objects.nebulas) scene.remove(this.objects.nebulas);
-                // Proper disposal of geometries and materials
                 Object.values(this.objects).forEach(obj => {
-                    if (obj.geometry) obj.geometry.dispose();
-                    if (obj.material) {
-                         if (obj.material.map) obj.material.map.dispose();
-                         obj.material.dispose();
+                    if (obj.isLight) {
+                        scene.remove(obj);
+                    } else if (obj.isPoints || obj.isGroup) {
+                        scene.remove(obj);
+                        if (obj.isGroup) {
+                            obj.children.forEach(child => {
+                                child.geometry.dispose();
+                                child.material.dispose();
+                            });
+                        } else {
+                            if (obj.geometry) obj.geometry.dispose();
+                            if (obj.material) {
+                                if (obj.material.map) obj.material.map.dispose();
+                                obj.material.dispose();
+                            }
+                        }
                     }
                 });
                 this.objects = {};
@@ -295,6 +339,14 @@
 
             regenerate(scene) {
                 this.destroy(scene);
+
+                // Add lighting for planets and asteroids
+                this.objects.ambientLight = new THREE.AmbientLight(0x404040, 2);
+                scene.add(this.objects.ambientLight);
+                this.objects.directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                this.objects.directionalLight.position.set(5, 3, 5);
+                scene.add(this.objects.directionalLight);
+
                 // Star Creation
                 const starVertices = [];
                 for (let i = 0; i < this.config.starCount; i++) {
@@ -322,6 +374,58 @@
                 });
                 this.objects.nebulas = new THREE.Points(nebulaGeometry, nebulaMaterial);
                 scene.add(this.objects.nebulas);
+                
+                // Planet Creation
+                const planets = new THREE.Group();
+                for (let i = 0; i < this.config.planetCount; i++) {
+                    const planetSize = Math.random() * 40 + 20;
+                    const geometry = new THREE.SphereGeometry(planetSize, 32, 32);
+                    const material = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(Math.random(), 0.7, 0.5),
+                        roughness: Math.random() * 0.5 + 0.3
+                    });
+                    const planet = new THREE.Mesh(geometry, material);
+                    planet.position.set(
+                        (Math.random() - 0.5) * 1500,
+                        (Math.random() - 0.5) * 1500,
+                        -Math.random() * 2500
+                    );
+                    planet.userData.speedZ = Math.random() * 0.2 + 0.05;
+                    planet.userData.rotationSpeed = new THREE.Vector3(Math.random() * 0.1, Math.random() * 0.1, 0);
+                    planets.add(planet);
+                }
+                this.objects.planets = planets;
+                scene.add(this.objects.planets);
+
+                // Asteroid Creation
+                const asteroids = new THREE.Group();
+                const asteroidGeometry = new THREE.IcosahedronGeometry(1, 0);
+                for (let i = 0; i < this.config.asteroidCount; i++) {
+                    const material = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setScalar(Math.random() * 0.3 + 0.2),
+                        roughness: 0.8
+                    });
+                    const asteroid = new THREE.Mesh(asteroidGeometry.clone(), material);
+                    const scale = Math.random() * 8 + 2;
+                    asteroid.scale.set(scale, scale, scale);
+                    // Deform geometry for irregular shape
+                    const positions = asteroid.geometry.attributes.position.array;
+                    for (let j = 0; j < positions.length; j += 3) {
+                         positions[j] += (Math.random() - 0.5) * 0.5;
+                         positions[j+1] += (Math.random() - 0.5) * 0.5;
+                         positions[j+2] += (Math.random() - 0.5) * 0.5;
+                    }
+                    asteroid.position.set(
+                        (Math.random() - 0.5) * 2000,
+                        (Math.random() - 0.5) * 2000,
+                        -Math.random() * 2500
+                    );
+                    asteroid.userData.speedZ = Math.random() * 0.5 + 0.1;
+                    asteroid.userData.rotationSpeed = new THREE.Vector3(Math.random() * 0.5, Math.random() * 0.5, Math.random() * 0.5);
+                    asteroids.add(asteroid);
+                }
+                this.objects.asteroids = asteroids;
+                scene.add(this.objects.asteroids);
             },
 
             generateTexture(type) {
@@ -353,9 +457,13 @@
                     <div class="control-row"><label for="speedMultiplier">Speed</label><input type="range" id="speedMultiplier" min="0.1" max="5" value="${this.config.speedMultiplier}" step="0.1"><span id="speedMultiplierValue">${this.config.speedMultiplier.toFixed(1)}</span></div>
                     <div class="control-row"><label for="nebulaCount">Nebula Count</label><input type="range" id="nebulaCount" min="0" max="200" value="${this.config.nebulaCount}" step="1"><span id="nebulaCountValue">${this.config.nebulaCount}</span></div>
                     <div class="control-row"><label for="nebulaSize">Nebula Size</label><input type="range" id="nebulaSize" min="50" max="1000" value="${this.config.nebulaSize}" step="10"><span id="nebulaSizeValue">${this.config.nebulaSize}</span></div>
+                    <div class="control-row"><label for="planetCount">Planet Count</label><input type="range" id="planetCount" min="0" max="20" value="${this.config.planetCount}" step="1"><span id="planetCountValue">${this.config.planetCount}</span></div>
+                    <div class="control-row"><label for="asteroidCount">Asteroid Count</label><input type="range" id="asteroidCount" min="0" max="200" value="${this.config.asteroidCount}" step="10"><span id="asteroidCountValue">${this.config.asteroidCount}</span></div>
                 `;
                  Object.keys(this.config).forEach(key => {
-                    document.getElementById(key).addEventListener('input', (e) => {
+                    const inputEl = document.getElementById(key);
+                    if (!inputEl) return;
+                    inputEl.addEventListener('input', (e) => {
                         const isFloat = e.target.step.includes('.');
                         const value = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
                         this.config[key] = value;
@@ -384,7 +492,7 @@
             },
             objects: {},
             blobs: [],
-            init: function() {
+            init: function(scene) {
                 this.blobs = [];
                 for (let i = 0; i < this.config.blobCount; i++) {
                     this.blobs.push({
@@ -495,10 +603,12 @@
                     material.uniforms.u_blobs.value[i] = blob.pos;
                 }
             },
-            destroy: function() {
+            destroy: function(scene) {
                 scene.remove(this.objects.mesh);
-                this.objects.mesh.geometry.dispose();
-                this.objects.material.dispose();
+                if (this.objects.mesh) {
+                    this.objects.mesh.geometry.dispose();
+                    this.objects.material.dispose();
+                }
             },
             createControls: function() {
                  const container = document.getElementById('scene-controls-container');
@@ -513,7 +623,7 @@
                     ${createColorPicker('color2', 'Color 2', this.config.color2)}
                     ${createColorPicker('bgColor', 'Background', this.config.bgColor)}
                 `;
-                addSliderListeners(this.config, () => { lavaLamp.destroy(); lavaLamp.init(); });
+                addSliderListeners(this.config, () => { lavaLamp.destroy(scene); lavaLamp.init(scene); });
                 addColorListeners(this.config, (key, value) => {
                     lavaLamp.objects.material.uniforms['u_' + key].value.set(value);
                 });
@@ -523,89 +633,14 @@
 
         // --- Helper Functions ---
 
-        function createSoftCircleTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64;
-            canvas.height = 64;
-            const context = canvas.getContext('2d');
-            const gradient = context.createRadialGradient(
-                canvas.width / 2, canvas.height / 2, 0,
-                canvas.width / 2, canvas.height / 2, canvas.width / 2
-            );
-            gradient.addColorStop(0, 'rgba(255,255,255,1)');
-            gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-            gradient.addColorStop(0.5, 'rgba(255,255,255,0.1)');
-            gradient.addColorStop(1, 'rgba(255,255,255,0)');
-
-            context.fillStyle = gradient;
-            context.fillRect(0, 0, canvas.width, canvas.height);
-
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        function createStars(count, size, color, range) {
-            const geometry = new THREE.BufferGeometry();
-            const positions = [];
-            for (let i = 0; i < count; i++) {
-                positions.push(
-                    (Math.random() - 0.5) * range * 2,
-                    (Math.random() - 0.5) * range * 2,
-                    (Math.random() - 0.5) * range * 2
-                );
-            }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            
-            const pointTexture = createSoftCircleTexture();
-            
-            const material = new THREE.PointsMaterial({
-                size: size,
-                color: color,
-                sizeAttenuation: true,
-                map: pointTexture,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            });
-            return new THREE.Points(geometry, material);
-        }
-
-        function createNebulas(count, size) {
-            const geometry = new THREE.BufferGeometry();
-            const positions = [];
-            const colors = [];
-            const nebulaColors = [new THREE.Color(0xff00ff), new THREE.Color(0x00ffff), new THREE.Color(0xffa500)];
-            for (let i = 0; i < count; i++) {
-                positions.push(
-                    (Math.random() - 0.5) * 1500,
-                    (Math.random() - 0.5) * 500,
-                    (Math.random() - 0.5) * 1500
-                );
-                const color = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
-                colors.push(color.r, color.g, color.b);
-            }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-            const pointTexture = createSoftCircleTexture();
-
-            const material = new THREE.PointsMaterial({
-                size: size,
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.2,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                map: pointTexture
-            });
-            return new THREE.Points(geometry, material);
-        }
-
         function createSlider(id, label, min, max, value, step = '') {
+            const stepAttr = step ? `step="${step}"` : '';
+            const displayValue = Number.isInteger(step) ? value : parseFloat(value).toFixed(Math.max(1, (step.toString().split('.')[1] || '').length));
             return `
                 <div class="control-row" id="row-${id}">
                     <label for="${id}">${label}</label>
-                    <input type="range" id="${id}" min="${min}" max="${max}" value="${value}" ${step ? `step="${step}"` : ''}>
-                    <span>${value}</span>
+                    <input type="range" id="${id}" min="${min}" max="${max}" value="${value}" ${stepAttr}>
+                    <span>${displayValue}</span>
                 </div>`;
         }
         function createColorPicker(id, label, value) {
@@ -620,11 +655,16 @@
 
         function addSliderListeners(config, recreateCallback) {
             document.querySelectorAll('#scene-controls-container input[type="range"]').forEach(slider => {
-                const needsRecreate = slider.id === 'starCount' || slider.id === 'nebulaCount' || slider.id === 'blobCount';
+                const needsRecreate = slider.id === 'blobCount';
                 slider.addEventListener('input', (e) => {
-                    const value = parseFloat(e.target.value);
+                    const step = e.target.step;
+                    const isFloat = step.includes('.');
+                    const value = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
                     config[e.target.id] = value;
-                    e.target.nextElementSibling.textContent = value;
+
+                    const displayValue = isFloat ? value.toFixed(Math.max(1, (step.split('.')[1] || '').length)) : value;
+                    e.target.nextElementSibling.textContent = displayValue;
+
                     if (slider.id === 'threshold' && lavaLamp.objects.material) {
                          lavaLamp.objects.material.uniforms.u_threshold.value = value;
                     }
@@ -667,7 +707,6 @@
 
                 activeSceneUpdater = scenes[sceneName];
                 
-                // Update text content based on scene
                 document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
                  document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
                     ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
@@ -676,7 +715,6 @@
                 activeSceneUpdater.init(scene);
                 activeSceneUpdater.createControls();
 
-                // Update UI
                 document.querySelectorAll('.scene-btn').forEach(btn => btn.classList.remove('active'));
                 document.querySelector(`.scene-btn[data-scene="${sceneName}"]`).classList.add('active');
                 document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
@@ -686,11 +724,11 @@
                 btn.addEventListener('click', () => switchScene(btn.dataset.scene));
             });
 
-            switchScene('deepSpace'); // Initial scene
+            switchScene('deepSpace');
 
+            setupInputListeners();
             window.addEventListener('resize', onWindowResize);
-            window.addEventListener('mousemove', onMouseMove);
-
+            
             document.getElementById('toggleContentBtn').addEventListener('click', () => {
                 document.querySelector('.content').classList.toggle('hidden');
             });
@@ -709,22 +747,177 @@
             hideSelectorBtn.addEventListener('click', () => { selectorPanel.classList.add('hidden'); showSelectorBtn.classList.add('visible'); });
             showSelectorBtn.addEventListener('click', () => { selectorPanel.classList.remove('hidden'); showSelectorBtn.classList.remove('visible'); });
             
-            // Generate/Copy code (simplified for now)
-            document.getElementById('generateCodeBtn').addEventListener('click', () => { alert('Code generation for this scene is not yet implemented.'); });
+            document.getElementById('generateCodeBtn').addEventListener('click', generateCode);
+            document.getElementById('copyCodeBtn').addEventListener('click', copyCode);
         }
 
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            if (activeSceneUpdater === lavaLamp) {
+            if (activeSceneUpdater === lavaLamp && lavaLamp.objects.material) {
                 lavaLamp.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
             }
         }
-
+        
         function onMouseMove(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onDeviceOrientation(event) {
+            // Gamma: left-to-right tilt. Range: -90 to 90
+            const gamma = event.gamma || 0; // left-to-right tilt
+            // Beta: front-to-back tilt. Range: -180 to 180
+            const beta = event.beta || 0; // front-to-back tilt
+
+            // Normalize and clamp the values for a smooth experience
+            mouse.x = Math.max(-1, Math.min(1, gamma / 45));
+            mouse.y = Math.max(-1, Math.min(1, beta / 60)); // Use a wider range for up/down tilt
+        }
+
+        function setupInputListeners() {
+            // Check if it's likely a mobile device
+            const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+            if (isMobile && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS 13+ devices
+                const motionPrompt = document.getElementById('motion-prompt');
+                motionPrompt.style.display = 'flex';
+                motionPrompt.addEventListener('click', function() {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(permissionState => {
+                            if (permissionState === 'granted') {
+                                window.addEventListener('deviceorientation', onDeviceOrientation);
+                            }
+                        })
+                        .catch(console.error);
+                    this.style.display = 'none';
+                });
+            } else if (isMobile) {
+                // Other mobile devices
+                window.addEventListener('deviceorientation', onDeviceOrientation);
+            } else {
+                // Desktop devices
+                window.addEventListener('mousemove', onMouseMove);
+            }
+        }
+
+        function generateCode() {
+            const sceneName = activeSceneUpdater.title.replace(' ', '');
+            const sceneObjectString = `const ${sceneName.charAt(0).toLowerCase() + sceneName.slice(1)} = ${activeSceneUpdater.toString()};`;
+            
+            const configString = JSON.stringify(activeSceneUpdater.config, null, 4);
+
+            const code = `
+// 1. Add a <canvas id="bg-canvas"></canvas> to your HTML body.
+// 2. Make sure to include three.js via a script tag or import map.
+
+import * as THREE from 'three';
+
+// --- Core Variables ---
+let scene, camera, renderer, activeSceneUpdater;
+const mouse = new THREE.Vector2();
+const clock = new THREE.Clock();
+const config = ${configString};
+
+// --- Scene Definition ---
+// Note: This is a simplified scene object for portability.
+// The full texture generation and control logic is embedded here.
+const sceneDefinition = {
+    // Paste the full scene object definition here from the generator
+    // For now, we manually recreate the key functions
+    title: "${activeSceneUpdater.title}",
+    config: config,
+    objects: {},
+    
+    // We need to bring all functions into this generated scope
+    init: ${activeSceneUpdater.init.toString()},
+    update: ${activeSceneUpdater.update.toString()},
+    destroy: ${activeSceneUpdater.destroy.toString()},
+    regenerate: ${activeSceneUpdater.regenerate ? activeSceneUpdater.regenerate.toString() : 'null'},
+    generateTexture: ${activeSceneUpdater.generateTexture ? activeSceneUpdater.generateTexture.toString() : 'null'},
+};
+
+
+// --- Input Handling (Mouse & Gyroscope) ---
+function onMouseMove(event) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+function onDeviceOrientation(event) {
+    const gamma = event.gamma || 0;
+    const beta = event.beta || 0;
+    mouse.x = Math.max(-1, Math.min(1, gamma / 45));
+    mouse.y = Math.max(-1, Math.min(1, beta / 60));
+}
+
+function setupInputListeners() {
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isMobile && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // You might want to create a button or prompt for this in your site's UI
+        const enableMotion = () => {
+            DeviceOrientationEvent.requestPermission()
+                .then(p => { if (p === 'granted') window.addEventListener('deviceorientation', onDeviceOrientation); })
+                .catch(console.error);
+            document.body.removeEventListener('click', enableMotion);
+        };
+        document.body.addEventListener('click', enableMotion);
+        alert("Tap the screen to enable motion controls.");
+
+    } else if (isMobile) {
+        window.addEventListener('deviceorientation', onDeviceOrientation);
+    } else {
+        window.addEventListener('mousemove', onMouseMove);
+    }
+}
+
+// --- Main Setup ---
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (sceneDefinition.title === "Lava Lamp" && sceneDefinition.objects.material) {
+        sceneDefinition.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+    }
+}
+
+function init() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+    camera.position.z = 1;
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    activeSceneUpdater = sceneDefinition;
+    activeSceneUpdater.init(scene);
+    
+    setupInputListeners();
+    window.addEventListener('resize', onWindowResize);
+    animate();
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    activeSceneUpdater.update(clock);
+    renderer.render(scene, camera);
+}
+
+init();
+`;
+            
+            const outputContainer = document.getElementById('code-output-container');
+            const outputTextarea = document.getElementById('code-output');
+            outputTextarea.value = code.trim();
+            outputContainer.style.display = 'block';
+        }
+
+        function copyCode() {
+            const outputTextarea = document.getElementById('code-output');
+            outputTextarea.select();
+            document.execCommand('copy');
+            alert('Code copied to clipboard!');
         }
         
         function animate() {
@@ -738,7 +931,6 @@
         init();
         animate();
     </script>
-     
     <script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
     <script>
     kofiWidgetOverlay.draw('alecdvor', {
