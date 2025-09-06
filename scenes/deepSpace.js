@@ -3,10 +3,12 @@ import * as THREE from 'three';
 const deepSpace = {
     title: "Deep Space",
     config: { starCount: 6000, starSize: 6.0, speedMultiplier: 1.0, nebulaCount: 50, nebulaSize: 350 },
-    objects: {}, // To hold stars, nebulas etc.
+    objects: {},
+    scene: null, // Property to hold the scene reference
 
     init(scene) {
-        this.regenerate(scene);
+        this.scene = scene; // Store the scene reference
+        this.regenerate();
     },
 
     update(clock, mouse, camera) {
@@ -25,12 +27,16 @@ const deepSpace = {
         }
         camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
         camera.position.y += (mouse.y * 0.5 - camera.position.y) * 0.02;
-        camera.lookAt(scene.position);
+        // FIX: Use the stored scene reference
+        camera.lookAt(this.scene.position);
     },
 
-    destroy(scene) {
-        if (this.objects.stars) scene.remove(this.objects.stars);
-        if (this.objects.nebulas) scene.remove(this.objects.nebulas);
+    destroy() {
+        if (!this.scene) return;
+        // FIX: Use 'this.scene' to remove objects
+        if (this.objects.stars) this.scene.remove(this.objects.stars);
+        if (this.objects.nebulas) this.scene.remove(this.objects.nebulas);
+        
         // Proper disposal of geometries and materials
         Object.values(this.objects).forEach(obj => {
             if (obj.geometry) obj.geometry.dispose();
@@ -42,8 +48,10 @@ const deepSpace = {
         this.objects = {};
     },
 
-    regenerate(scene) {
-        this.destroy(scene);
+    regenerate() {
+        if (!this.scene) return;
+        this.destroy();
+        
         // Star Creation
         const starVertices = [];
         for (let i = 0; i < this.config.starCount; i++) {
@@ -56,7 +64,8 @@ const deepSpace = {
             blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
         });
         this.objects.stars = new THREE.Points(starGeometry, starMaterial);
-        scene.add(this.objects.stars);
+        // FIX: Use 'this.scene' to add objects
+        this.scene.add(this.objects.stars);
 
         // Nebula Creation
         const nebulaVertices = [];
@@ -70,7 +79,8 @@ const deepSpace = {
             blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.2 + Math.random() * 0.2
         });
         this.objects.nebulas = new THREE.Points(nebulaGeometry, nebulaMaterial);
-        scene.add(this.objects.nebulas);
+        // FIX: Use 'this.scene' to add objects
+        this.scene.add(this.objects.nebulas);
     },
 
     generateTexture(type) {
@@ -94,7 +104,7 @@ const deepSpace = {
         return new THREE.CanvasTexture(canvas);
     },
 
-    createControls(scene) {
+    createControls() {
         const container = document.getElementById('scene-controls-container');
         container.innerHTML = `
             <div class="control-row"><label for="starCount">Star Count</label><input type="range" id="starCount" min="500" max="20000" value="${this.config.starCount}" step="100"><span id="starCountValue">${this.config.starCount}</span></div>
@@ -113,7 +123,8 @@ const deepSpace = {
 
                 if (key === 'starSize' && this.objects.stars) this.objects.stars.material.size = value;
                 else if (key === 'nebulaSize' && this.objects.nebulas) this.objects.nebulas.material.size = value;
-                else if (key !== 'speedMultiplier') this.regenerate(scene);
+                // FIX: Call regenerate without passing the scene, since it's now stored
+                else if (key !== 'speedMultiplier') this.regenerate();
             });
         });
     }
