@@ -157,14 +157,12 @@
 
         .control-row {
             margin-bottom: 15px; display: grid;
-            /* Adjusted grid to give text input more space */
             grid-template-columns: 100px 1fr 60px; 
             align-items: center; gap: 10px;
         }
         .control-row label { font-size: 0.9rem; }
         .control-row input[type="range"] { width: 100%; }
         
-        /* Updated styles for both span and the new input */
         .control-row span, .control-row input[type="text"], .control-row input[type="color"] {
             text-align: right; font-size: 0.9rem;
             background: #222; padding: 5px; border-radius: 4px;
@@ -206,6 +204,94 @@
             box-sizing: border-box;
             resize: vertical;
         }
+
+        /* --- Generate Code Modal Styles --- */
+        #code-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #code-modal.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: rgba(40, 40, 50, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 90%;
+            max-width: 700px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        #code-modal.visible .modal-content {
+            transform: scale(1);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 15px;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        #close-modal-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 2rem;
+            line-height: 1;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        #close-modal-btn:hover {
+            color: white;
+        }
+        #embed-code {
+            width: 100%;
+            height: 250px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #eee;
+            font-family: monospace;
+            font-size: 0.9rem;
+            padding: 15px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        #copy-code-btn {
+            width: 100%;
+            padding: 12px;
+            background: #4A90E2;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background-color 0.2s;
+        }
+        #copy-code-btn:hover {
+            background-color: #357ABD;
+        }
     </style>
 </head>
 <body>
@@ -241,9 +327,20 @@
             <button id="copyCodeBtn">Copy Code</button>
         </div>
     </div>
-
+    
     <button id="showControlsBtn" class="show-btn" title="Show Controls">⚙️</button>
     <button id="showSelectorBtn" class="show-btn" title="Show Scenes">🎨</button>
+
+    <div id="code-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Embed Code</h2>
+                <button id="close-modal-btn">&times;</button>
+            </div>
+            <textarea id="embed-code" readonly></textarea>
+            <button id="copy-code-btn">Copy to Clipboard</button>
+        </div>
+    </div>
 
     <script type="importmap">
         { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js" } }
@@ -251,20 +348,15 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- Core Three.js and UI Variables ---
         let scene, camera, renderer;
         let activeSceneUpdater = null;
+        let activeSceneName = ''; // Keep track of the current scene's name
         const mouse = new THREE.Vector2();
         const clock = new THREE.Clock();
-        const loadedScenes = {}; // Store loaded scene objects
+        const loadedScenes = {};
+        const defaultConfigs = {}; // Store default configs for comparison
 
-        // --- THIS IS THE PART YOUR SERVER WOULD GENERATE ---
-        // In a real application, this array would be created by your server
-        // reading the /scenes/ directory. To add a new scene, add its filename here.
         const sceneFiles = ['deepSpace.js', 'lavaLamp.js'];
-        // ----------------------------------------------------
-
-        // --- Main Logic ---
 
         async function init() {
             scene = new THREE.Scene();
@@ -276,13 +368,11 @@
             
             await loadScenesAndBuildUI();
 
-            // Set the first scene as the default
             if (sceneFiles.length > 0) {
                 const firstSceneName = sceneFiles[0].replace('.js', '');
                 switchScene(firstSceneName);
             } else {
                  document.getElementById('page-title').textContent = "No Scenes Found";
-                 document.getElementById('page-subtitle').textContent = "Add scene files to the '/scenes/' directory.";
             }
 
             // --- Event Listeners ---
@@ -293,21 +383,23 @@
                 document.querySelector('.content').classList.toggle('hidden');
             });
             
-            // Hide/Show Controls Panel
             const controlsPanel = document.getElementById('controls');
             const hideControlsBtn = document.getElementById('hideControlsBtn');
             const showControlsBtn = document.getElementById('showControlsBtn');
             hideControlsBtn.addEventListener('click', () => { controlsPanel.classList.add('hidden'); showControlsBtn.classList.add('visible'); });
             showControlsBtn.addEventListener('click', () => { controlsPanel.classList.remove('hidden'); showControlsBtn.classList.remove('visible'); });
 
-            // Hide/Show Scene Selector
             const selectorPanel = document.getElementById('scene-selector');
             const hideSelectorBtn = document.getElementById('hideSelectorBtn');
             const showSelectorBtn = document.getElementById('showSelectorBtn');
             hideSelectorBtn.addEventListener('click', () => { selectorPanel.classList.add('hidden'); showSelectorBtn.classList.add('visible'); });
             showSelectorBtn.addEventListener('click', () => { selectorPanel.classList.remove('hidden'); showSelectorBtn.classList.remove('visible'); });
             
-            document.getElementById('generateCodeBtn').addEventListener('click', () => { alert('Code generation for this scene is not yet implemented.'); });
+            document.getElementById('generateCodeBtn').addEventListener('click', generateEmbedCode);
+
+            const codeModal = document.getElementById('code-modal');
+            document.getElementById('close-modal-btn').addEventListener('click', () => codeModal.classList.remove('visible'));
+            document.getElementById('copy-code-btn').addEventListener('click', copyEmbedCode);
         }
 
         async function loadScenesAndBuildUI() {
@@ -316,18 +408,17 @@
             for (const fileName of sceneFiles) {
                 const sceneName = fileName.replace('.js', '');
                 try {
-                    // Dynamically import the scene module from the 'scenes' directory
                     const module = await import(`./scenes/${fileName}`);
                     
-                    // Assumes the exported object has the same name as the scene (e.g., deepSpace)
                     if (module[sceneName]) {
                         loadedScenes[sceneName] = module[sceneName];
+                        // Store a deep copy of the default config
+                        defaultConfigs[sceneName] = JSON.parse(JSON.stringify(module[sceneName].config));
                         
-                        // Create a button for the scene selector
                         const btn = document.createElement('button');
                         btn.className = 'scene-btn';
                         btn.dataset.scene = sceneName;
-                        btn.textContent = module[sceneName].title || sceneName; // Use title from scene object
+                        btn.textContent = module[sceneName].title || sceneName;
                         btn.onclick = () => switchScene(sceneName);
                         container.appendChild(btn);
                     }
@@ -341,11 +432,16 @@
             if (activeSceneUpdater) {
                 activeSceneUpdater.destroy(scene);
             }
+
+            // Reset scene config to its default before initializing
+            loadedScenes[sceneName].config = JSON.parse(JSON.stringify(defaultConfigs[sceneName]));
+            
             camera.position.set(0,0,1);
             camera.rotation.set(0,0,0);
             scene.rotation.set(0,0,0);
 
             activeSceneUpdater = loadedScenes[sceneName];
+            activeSceneName = sceneName;
             
             document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
             document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
@@ -360,12 +456,57 @@
             document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
         }
 
+        function generateEmbedCode() {
+            if (!activeSceneUpdater) return;
+
+            const defaultConfig = defaultConfigs[activeSceneName];
+            const currentConfig = activeSceneUpdater.config;
+            const customConfig = {};
+
+            for (const key in currentConfig) {
+                if (JSON.stringify(currentConfig[key]) !== JSON.stringify(defaultConfig[key])) {
+                    customConfig[key] = currentConfig[key];
+                }
+            }
+            
+            const configString = Object.keys(customConfig).length > 0 ? `\n  config: ${JSON.stringify(customConfig, null, 2)}\n` : '';
+
+            const embedCode = `<div id="my-background"></div>
+
+<script type="module">
+  import { embed } from 'https://alecdvor.github.io/3JSBG/embed.js';
+
+  embed({
+    scene: '${activeSceneName}',
+    target: '#my-background',${configString}});
+<\/script>`;
+
+            const codeTextarea = document.getElementById('embed-code');
+            codeTextarea.value = embedCode;
+            document.getElementById('code-modal').classList.add('visible');
+        }
+
+        function copyEmbedCode() {
+            const codeTextarea = document.getElementById('embed-code');
+            const copyButton = document.getElementById('copy-code-btn');
+            
+            navigator.clipboard.writeText(codeTextarea.value).then(() => {
+                copyButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyButton.textContent = 'Copy to Clipboard';
+                }, 2000);
+            }).catch(err => {
+                copyButton.textContent = 'Failed to copy';
+                console.error('Failed to copy code: ', err);
+            });
+        }
+        
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            if (activeSceneUpdater === loadedScenes.lavaLamp) {
-                loadedScenes.lavaLamp.objects.material.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+            if (activeSceneUpdater.onWindowResize) { // Check if scene has this method
+                activeSceneUpdater.onWindowResize(window.innerWidth, window.innerHeight);
             }
         }
 
