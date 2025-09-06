@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from './utils.js';
+import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 const lavaLamp = {
     config: {
