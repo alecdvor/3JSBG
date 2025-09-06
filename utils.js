@@ -78,7 +78,7 @@ function createNebulas(count, size) {
 }
 
 function createSlider(id, label, min, max, value, step = '') {
-    const isFloat = step.includes('.');
+    const isFloat = String(step).includes('.');
     const displayValue = isFloat ? parseFloat(value).toFixed(2) : value;
     return `
         <div class="control-row" id="row-${id}">
