@@ -45,10 +45,13 @@ export const volumetricSmoke = {
 
     config: {
         density: 1.2,
-        noiseScale: 2.5,
+        noiseScale: 1.5,
         noiseSpeed: 0.1,
-        light1Speed: 0.5, // New property for light 1 speed
-        light2Speed: 0.3, // New property for light 2 speed
+        octaves: 4,         // New: Number of noise layers for detail
+        lacunarity: 2.0,    // New: How much detail is added each layer
+        gain: 0.5,          // New: How much each layer contributes
+        light1Speed: 0.5,
+        light2Speed: 0.3,
         light1Color: '#ff80ab',
         light1Intensity: 2.0,
         light2Color: '#80d8ff',
@@ -60,14 +63,14 @@ export const volumetricSmoke = {
     init(scene) {
         this.scene = scene;
 
-        const size = 64;
+        const size = 128; // Increased texture size for more detail
         const data = new Uint8Array(size * size * size);
         const perlin = new ImprovedNoise();
         let i = 0;
         for (let z = 0; z < size; z++) {
             for (let y = 0; y < size; y++) {
                 for (let x = 0; x < size; x++) {
-                    const noise = perlin.noise(x / size * 5, y / size * 5, z / size * 5);
+                    const noise = perlin.noise(x/32, y/32, z/32);
                     data[i++] = noise * 128 + 128;
                 }
             }
@@ -88,6 +91,9 @@ export const volumetricSmoke = {
                 uDensity: { value: this.config.density },
                 uNoiseScale: { value: this.config.noiseScale },
                 uNoiseSpeed: { value: this.config.noiseSpeed },
+                uOctaves: { value: this.config.octaves },
+                uLacunarity: { value: this.config.lacunarity },
+                uGain: { value: this.config.gain },
                 uLight1Color: { value: new THREE.Color(this.config.light1Color) },
                 uLight1Intensity: { value: this.config.light1Intensity },
                 uLight1Pos: { value: new THREE.Vector3() },
@@ -104,13 +110,17 @@ export const volumetricSmoke = {
                 }
             `,
             fragmentShader: `
-                precision mediump float;
+                precision highp float;
                 precision highp sampler3D;
+
                 varying vec3 vWorldPosition;
                 uniform float uTime;
                 uniform float uDensity;
                 uniform float uNoiseScale;
                 uniform float uNoiseSpeed;
+                uniform int uOctaves;
+                uniform float uLacunarity;
+                uniform float uGain;
                 uniform vec3 uLight1Color;
                 uniform float uLight1Intensity;
                 uniform vec3 uLight1Pos;
@@ -119,27 +129,50 @@ export const volumetricSmoke = {
                 uniform vec3 uLight2Pos;
                 uniform sampler3D uNoiseTex;
 
-                float getNoise(vec3 pos) {
-                    return texture(uNoiseTex, pos * uNoiseScale + vec3(uTime * uNoiseSpeed, 0.0, 0.0)).r;
+                // --- NEW: FBM (Fractal Brownian Motion) function ---
+                // This layers multiple noise samples to create detail.
+                float fbm(vec3 p) {
+                    float value = 0.0;
+                    float amplitude = 1.0;
+                    float frequency = 1.0;
+                    for (int i = 0; i < 10; i++) {
+                        if (i >= uOctaves) break;
+                        value += amplitude * texture(uNoiseTex, p * frequency).r;
+                        frequency *= uLacunarity;
+                        amplitude *= uGain;
+                    }
+                    return value;
                 }
 
                 void main() {
                     vec3 rayDir = normalize(vWorldPosition - cameraPosition);
                     vec3 rayPos = cameraPosition;
                     vec3 accumulatedColor = vec3(0.0);
-                    for (int i = 0; i < 32; i++) {
-                        rayPos += rayDir * 0.2;
-                        float noise = getNoise(rayPos);
-                        float density = smoothstep(0.4, 0.6, noise) * uDensity;
+                    float accumulatedAlpha = 0.0;
+
+                    for (int i = 0; i < 48; i++) {
+                        if (accumulatedAlpha > 0.99) break;
+
+                        vec3 p = rayPos * uNoiseScale + vec3(uTime * uNoiseSpeed, uTime * uNoiseSpeed * 0.5, 0.0);
+                        float noise = fbm(p);
+                        float density = pow(max(0.0, noise), 2.0) * uDensity;
+
                         if (density > 0.01) {
                             float dist1 = max(0.1, distance(rayPos, uLight1Pos));
                             float dist2 = max(0.1, distance(rayPos, uLight2Pos));
+                            
                             vec3 light1 = (uLight1Color * uLight1Intensity) / (dist1 * dist1);
                             vec3 light2 = (uLight2Color * uLight2Intensity) / (dist2 * dist2);
-                            accumulatedColor += (light1 + light2) * density * 0.1;
+                            
+                            vec3 lightedColor = (light1 + light2) * density;
+                            
+                            // Blend colors based on transparency
+                            accumulatedColor += lightedColor * (1.0 - accumulatedAlpha);
+                            accumulatedAlpha += density * 0.1;
                         }
+                        rayPos += rayDir * 0.15; // Step through the volume
                     }
-                    gl_FragColor = vec4(accumulatedColor, 1.0);
+                    gl_FragColor = vec4(accumulatedColor, accumulatedAlpha);
                 }
             `,
         });
@@ -155,20 +188,11 @@ export const volumetricSmoke = {
         const elapsedTime = clock.getElapsedTime();
         this.objects.material.uniforms.uTime.value = elapsedTime;
 
-        // Animate lights with their independent speeds
         const time1 = elapsedTime * this.config.light1Speed;
         const time2 = elapsedTime * this.config.light2Speed;
 
-        this.objects.light1.position.set(
-            Math.sin(time1 * 0.8) * 4,
-            Math.cos(time1 * 0.6) * 2,
-            Math.cos(time1 * 1.0) * 4
-        );
-        this.objects.light2.position.set(
-            Math.cos(time2 * 0.4) * 4,
-            Math.sin(time2 * 1.0) * 2,
-            Math.sin(time2 * 0.6) * 4
-        );
+        this.objects.light1.position.set(Math.sin(time1 * 0.8) * 4, Math.cos(time1 * 0.6) * 2, Math.cos(time1 * 1.0) * 4);
+        this.objects.light2.position.set(Math.cos(time2 * 0.4) * 4, Math.sin(time2 * 1.0) * 2, Math.sin(time2 * 0.6) * 4);
         this.objects.material.uniforms.uLight1Pos.value.copy(this.objects.light1.position);
         this.objects.material.uniforms.uLight2Pos.value.copy(this.objects.light2.position);
     },
@@ -187,8 +211,12 @@ export const volumetricSmoke = {
         container.innerHTML = `
             <h3>Smoke</h3>
             ${createSlider('density', 'Density', 0.1, 5, this.config.density, '0.1')}
-            ${createSlider('noiseScale', 'Scale', 0.1, 10, this.config.noiseScale, '0.1')}
-            ${createSlider('noiseSpeed', 'Noise Speed', 0, 0.5, this.config.noiseSpeed, '0.01')}
+            ${createSlider('noiseScale', 'Scale', 0.1, 5, this.config.noiseScale, '0.1')}
+            ${createSlider('noiseSpeed', 'Speed', 0, 0.5, this.config.noiseSpeed, '0.01')}
+            <h3>Smoke Detail</h3>
+            ${createSlider('octaves', 'Octaves', 1, 8, this.config.octaves, '1')}
+            ${createSlider('lacunarity', 'Frequency', 1.0, 3.0, this.config.lacunarity, '0.1')}
+            ${createSlider('gain', 'Contribution', 0.1, 1.0, this.config.gain, '0.1')}
             <h3>Light 1</h3>
             ${createSlider('light1Speed', 'Speed', 0, 2, this.config.light1Speed, '0.1')}
             ${createSlider('light1Intensity', 'Intensity', 0, 10, this.config.light1Intensity, '0.1')}
@@ -206,11 +234,13 @@ export const volumetricSmoke = {
         });
         
         // Add direct listeners for uniform updates
-        ['density', 'noiseScale', 'noiseSpeed', 'light1Intensity', 'light2Intensity'].forEach(id => {
+        const uniformControls = ['density', 'noiseScale', 'noiseSpeed', 'octaves', 'lacunarity', 'gain', 'light1Intensity', 'light2Intensity'];
+        uniformControls.forEach(id => {
             document.getElementById(id).addEventListener('input', (e) => {
                 const uniformName = `u${id.charAt(0).toUpperCase() + id.slice(1)}`;
                 if (this.objects.material.uniforms[uniformName]) {
-                    this.objects.material.uniforms[uniformName].value = parseFloat(e.target.value);
+                    const value = id === 'octaves' ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
+                    this.objects.material.uniforms[uniformName].value = value;
                 }
             });
         });
