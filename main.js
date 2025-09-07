@@ -2,13 +2,13 @@ import * as THREE from 'three';
 
 let scene, camera, renderer;
 let activeSceneUpdater = null;
-let activeSceneName = '';
+let activeSceneName = ''; // Keep track of the current scene's name
 const mouse = new THREE.Vector2();
 const clock = new THREE.Clock();
 const loadedScenes = {};
-const defaultConfigs = {};
+const defaultConfigs = {}; // Store default configs for comparison
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 'bugSwarm.js', 'particleVortex.js', 'oceanView.js'];
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 'bugSwarm.js', 'oceanView.js'];
 
 async function init() {
     scene = new THREE.Scene();
@@ -35,20 +35,18 @@ async function init() {
         document.querySelector('.content').classList.toggle('hidden');
     });
     
-    // Controls Panel Hide/Show
     const controlsPanel = document.getElementById('controls');
     const hideControlsBtn = document.getElementById('hideControlsBtn');
     const showControlsBtn = document.getElementById('showControlsBtn');
     hideControlsBtn.addEventListener('click', () => { controlsPanel.classList.add('hidden'); showControlsBtn.classList.add('visible'); });
     showControlsBtn.addEventListener('click', () => { controlsPanel.classList.remove('hidden'); showControlsBtn.classList.remove('visible'); });
 
-    // Scene Selector Modal
-    const sceneModal = document.getElementById('scene-selector-modal');
-    document.getElementById('open-scene-modal-btn').addEventListener('click', () => sceneModal.classList.add('visible'));
-    document.getElementById('close-scene-modal-btn').addEventListener('click', () => sceneModal.classList.remove('visible'));
+    const selectorPanel = document.getElementById('scene-selector-modal');
+    document.getElementById('open-scene-modal-btn').addEventListener('click', () => selectorPanel.classList.add('visible'));
+    document.getElementById('close-scene-modal-btn').addEventListener('click', () => selectorPanel.classList.remove('visible'));
     
-    // Code Exporter Modal
     document.getElementById('generateCodeBtn').addEventListener('click', generateEmbedCode);
+
     const codeModal = document.getElementById('code-modal');
     document.getElementById('close-code-modal-btn').addEventListener('click', () => codeModal.classList.remove('visible'));
     document.getElementById('copy-code-btn').addEventListener('click', copyEmbedCode);
@@ -57,7 +55,7 @@ async function init() {
 async function loadScenesAndBuildUI() {
     const container = document.getElementById('scene-buttons-container');
     const sceneModal = document.getElementById('scene-selector-modal');
-    
+
     for (const fileName of sceneFiles) {
         const sceneName = fileName.replace('.js', '');
         try {
@@ -73,7 +71,7 @@ async function loadScenesAndBuildUI() {
                 btn.textContent = module[sceneName].title || sceneName;
                 btn.onclick = () => {
                     switchScene(sceneName);
-                    sceneModal.classList.remove('visible'); // Close modal on selection
+                    sceneModal.classList.remove('visible');
                 };
                 container.appendChild(btn);
             }
@@ -102,8 +100,9 @@ function switchScene(sceneName) {
         ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
         : 'Watch the mesmerizing fluid dynamics. Use the controls to change the flow.';
     
-    activeSceneUpdater.init(scene);
-    activeSceneUpdater.createControls(scene);
+    // --- FIX: Pass the renderer to the scene's init and createControls functions ---
+    activeSceneUpdater.init(scene, renderer);
+    activeSceneUpdater.createControls(scene, renderer);
 
     document.querySelectorAll('#scene-buttons-container .scene-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelector(`#scene-buttons-container .scene-btn[data-scene="${sceneName}"]`).classList.add('active');
@@ -112,12 +111,10 @@ function switchScene(sceneName) {
 
 function generateEmbedCode() {
     if (!activeSceneUpdater) return;
-
     const currentConfig = activeSceneUpdater.config;
     const configString = Object.keys(currentConfig).length > 0 
         ? `\n  config: ${JSON.stringify(currentConfig, null, 2)}\n` 
         : '';
-
     const embedCode = `<div id="my-background"></div>
 
 <script type="module">
@@ -127,7 +124,6 @@ function generateEmbedCode() {
     scene: '${activeSceneName}',
     target: '#my-background',${configString}});
 <\/script>`;
-
     document.getElementById('embed-code').value = embedCode;
     document.getElementById('code-modal').classList.add('visible');
 }
