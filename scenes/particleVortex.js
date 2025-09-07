@@ -9,7 +9,7 @@ export const particleVortex = {
         particleCount: 15000,
         particleSize: 25,
         vortexStrength: 0.5,
-        flowSpeed: 0.1,
+        flowSpeed: 0.02, // Lowered default speed
         color1: '#ff4081',
         color2: '#00bcd4',
         mouseInfluence: 0.1,
@@ -24,7 +24,6 @@ export const particleVortex = {
 
         this.regenerateParticles();
 
-        // Used to track mouse position for interaction
         this.objects.mouseTarget = new THREE.Vector2();
     },
 
@@ -48,7 +47,6 @@ export const particleVortex = {
             const z = (Math.random() - 0.5) * 2 * this.config.fieldSize;
             vertices.push(x, y, z);
             
-            // Assign a color based on its position, blending between the two chosen colors
             const mixRatio = (y / (this.config.fieldSize * 2)) + 0.5;
             const mixedColor = color1.clone().lerp(color2, mixRatio);
             colors.push(mixedColor.r, mixedColor.g, mixedColor.b);
@@ -57,7 +55,6 @@ export const particleVortex = {
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-        // Create a texture for the particles
         const sprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
         sprite.colorSpace = THREE.SRGBColorSpace;
 
@@ -77,13 +74,11 @@ export const particleVortex = {
     update(clock, mouse, camera) {
         if (!this.objects.particles) return;
 
-        camera.position.z = 1200; // Keep camera at a good distance
+        camera.position.z = 1200;
 
-        // Smoothly update the mouse target for a softer interaction
         this.objects.mouseTarget.x += (mouse.x - this.objects.mouseTarget.x) * 0.05;
         this.objects.mouseTarget.y += (mouse.y - this.objects.mouseTarget.y) * 0.05;
 
-        // Animate the camera's position based on the mouse
         camera.position.x = this.objects.mouseTarget.x * 200;
         camera.position.y = -this.objects.mouseTarget.y * 200;
         camera.lookAt(this.scene.position);
@@ -95,14 +90,12 @@ export const particleVortex = {
             const x = positions[i];
             const y = positions[i + 1];
             
-            // Vortex animation
             const angle = Math.atan2(y, x) + elapsedTime * this.config.flowSpeed;
             const radius = Math.sqrt(x*x + y*y);
 
             positions[i] = Math.cos(angle) * radius - y * this.config.vortexStrength * 0.01;
             positions[i+1] = Math.sin(angle) * radius + x * this.config.vortexStrength * 0.01;
             
-            // Mouse interaction: push particles on the z-axis
             const mouseInfluence = Math.exp(-0.001 * (Math.pow(x - this.objects.mouseTarget.x * 1000, 2) + Math.pow(y + this.objects.mouseTarget.y * 1000, 2)));
             positions[i+2] += (Math.sin(elapsedTime * 5 + y * 0.01) * 10) * mouseInfluence * this.config.mouseInfluence;
         }
@@ -128,7 +121,7 @@ export const particleVortex = {
             ${createSlider('fieldSize', 'Field Size', 200, 2000, this.config.fieldSize, '50')}
             <h3>Animation</h3>
             ${createSlider('vortexStrength', 'Vortex Strength', 0, 2, this.config.vortexStrength, '0.1')}
-            ${createSlider('flowSpeed', 'Flow Speed', 0, 0.5, this.config.flowSpeed, '0.01')}
+            ${createSlider('flowSpeed', 'Flow Speed', 0, 0.1, this.config.flowSpeed, '0.001')} 
             <h3>Interaction</h3>
             ${createSlider('mouseInfluence', 'Mouse Influence', 0, 1, this.config.mouseInfluence, '0.05')}
             <h3>Colors</h3>
@@ -143,7 +136,7 @@ export const particleVortex = {
         });
 
         addColorListeners(this.config, () => {
-             this.regenerateParticles(); // Regenerate to apply new colors
+             this.regenerateParticles();
         });
         
         document.getElementById('particleSize').addEventListener('input', (e) => {
