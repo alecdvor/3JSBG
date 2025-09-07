@@ -47,7 +47,8 @@ export const volumetricSmoke = {
         density: 1.2,
         noiseScale: 2.5,
         noiseSpeed: 0.1,
-        lightSpeed: 0.5, // New property for light speed
+        light1Speed: 0.5, // New property for light 1 speed
+        light2Speed: 0.3, // New property for light 2 speed
         light1Color: '#ff80ab',
         light1Intensity: 2.0,
         light2Color: '#80d8ff',
@@ -151,18 +152,22 @@ export const volumetricSmoke = {
     },
 
     update(clock) {
-        const elapsedTime = clock.getElapsedTime() * this.config.lightSpeed; // Use the lightSpeed config
-        this.objects.material.uniforms.uTime.value = clock.getElapsedTime(); // Keep noise speed independent
+        const elapsedTime = clock.getElapsedTime();
+        this.objects.material.uniforms.uTime.value = elapsedTime;
+
+        // Animate lights with their independent speeds
+        const time1 = elapsedTime * this.config.light1Speed;
+        const time2 = elapsedTime * this.config.light2Speed;
 
         this.objects.light1.position.set(
-            Math.sin(elapsedTime * 0.4) * 4,
-            Math.cos(elapsedTime * 0.3) * 2,
-            Math.cos(elapsedTime * 0.5) * 4
+            Math.sin(time1 * 0.8) * 4,
+            Math.cos(time1 * 0.6) * 2,
+            Math.cos(time1 * 1.0) * 4
         );
         this.objects.light2.position.set(
-            Math.cos(elapsedTime * 0.2) * 4,
-            Math.sin(elapsedTime * 0.5) * 2,
-            Math.sin(elapsedTime * 0.3) * 4
+            Math.cos(time2 * 0.4) * 4,
+            Math.sin(time2 * 1.0) * 2,
+            Math.sin(time2 * 0.6) * 4
         );
         this.objects.material.uniforms.uLight1Pos.value.copy(this.objects.light1.position);
         this.objects.material.uniforms.uLight2Pos.value.copy(this.objects.light2.position);
@@ -184,12 +189,14 @@ export const volumetricSmoke = {
             ${createSlider('density', 'Density', 0.1, 5, this.config.density, '0.1')}
             ${createSlider('noiseScale', 'Scale', 0.1, 10, this.config.noiseScale, '0.1')}
             ${createSlider('noiseSpeed', 'Noise Speed', 0, 0.5, this.config.noiseSpeed, '0.01')}
-            <h3>Lights</h3>
-            ${createSlider('lightSpeed', 'Light Speed', 0, 2, this.config.lightSpeed, '0.1')}
-            ${createSlider('light1Intensity', 'Light 1 Intensity', 0, 10, this.config.light1Intensity, '0.1')}
-            ${createColorPicker('light1Color', 'Light 1 Color', this.config.light1Color)}
-            ${createSlider('light2Intensity', 'Light 2 Intensity', 0, 10, this.config.light2Intensity, '0.1')}
-            ${createColorPicker('light2Color', 'Light 2 Color', this.config.light2Color)}
+            <h3>Light 1</h3>
+            ${createSlider('light1Speed', 'Speed', 0, 2, this.config.light1Speed, '0.1')}
+            ${createSlider('light1Intensity', 'Intensity', 0, 10, this.config.light1Intensity, '0.1')}
+            ${createColorPicker('light1Color', 'Color', this.config.light1Color)}
+            <h3>Light 2</h3>
+            ${createSlider('light2Speed', 'Speed', 0, 2, this.config.light2Speed, '0.1')}
+            ${createSlider('light2Intensity', 'Intensity', 0, 10, this.config.light2Intensity, '0.1')}
+            ${createColorPicker('light2Color', 'Color', this.config.light2Color)}
         `;
 
         addSliderListeners(this.config, null);
@@ -198,6 +205,7 @@ export const volumetricSmoke = {
             if (key === 'light2Color') this.objects.material.uniforms.uLight2Color.value.set(value);
         });
         
+        // Add direct listeners for uniform updates
         ['density', 'noiseScale', 'noiseSpeed', 'light1Intensity', 'light2Intensity'].forEach(id => {
             document.getElementById(id).addEventListener('input', (e) => {
                 const uniformName = `u${id.charAt(0).toUpperCase() + id.slice(1)}`;
