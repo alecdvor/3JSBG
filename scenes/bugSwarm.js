@@ -28,19 +28,16 @@ export const bugSwarm = {
         this.objects.roaches = new THREE.Group();
         this.scene.add(this.objects.roaches);
 
-        // --- CORRECTED Wing Geometry ---
-        // The corner at (0,0,0) is now the attachment point.
         const wingGeo = new THREE.BufferGeometry();
         const wingVertices = new Float32Array([
-            0, 0, 0,    // Attachment point
-            0, 0.05, 0.3,  // Upper wing tip
-            0, -0.05, 0.3 // Lower wing tip
+            0, 0, 0,
+            0, 0.05, 0.3,
+            0, -0.05, 0.3
         ]);
         wingGeo.setAttribute('position', new THREE.BufferAttribute(wingVertices, 3));
         wingGeo.computeVertexNormals();
         const wingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
 
-        // --- Create Fireflies ---
         const fireflyBodyGeo = new THREE.SphereGeometry(0.05, 8, 8);
         const fireflyBodyMat = new THREE.MeshBasicMaterial({ color: this.config.fireflyColor });
 
@@ -55,11 +52,13 @@ export const bugSwarm = {
             
             const leftWing = new THREE.Mesh(wingGeo, wingMat);
             leftWing.position.set(0.05, 0, 0);
+            leftWing.rotation.y = Math.PI; // --- FIX: Rotate wing to face backward ---
             firefly.add(leftWing);
 
             const rightWing = new THREE.Mesh(wingGeo, wingMat);
             rightWing.position.set(-0.05, 0, 0);
-            rightWing.scale.x = -1; // Flip the wing
+            rightWing.rotation.y = Math.PI; // --- FIX: Rotate wing to face backward ---
+            rightWing.scale.x = -1; 
             firefly.add(rightWing);
             
             firefly.userData.wings = [leftWing, rightWing];
@@ -76,7 +75,6 @@ export const bugSwarm = {
             this.objects.fireflies.add(firefly);
         }
 
-        // --- Create Roaches ---
         const roachBodyGeo = new THREE.CapsuleGeometry(0.1, 0.2, 4, 8);
         const roachBodyMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.4, metalness: 0.1 });
         
@@ -91,11 +89,13 @@ export const bugSwarm = {
             const leftWing = new THREE.Mesh(wingGeo, wingMat);
             leftWing.scale.set(1.5, 1, 1.5);
             leftWing.position.set(0.1, 0.05, 0); 
+            leftWing.rotation.y = Math.PI; // --- FIX: Rotate wing to face backward ---
             roach.add(leftWing);
 
             const rightWing = new THREE.Mesh(wingGeo, wingMat);
             rightWing.scale.set(1.5, 1, 1.5);
             rightWing.position.set(-0.1, 0.05, 0);
+            rightWing.rotation.y = Math.PI; // --- FIX: Rotate wing to face backward ---
             rightWing.scale.x = -1;
             roach.add(rightWing);
 
@@ -127,15 +127,12 @@ export const bugSwarm = {
         const bounds = this.config.bounds / 2;
         bug.position.add(bug.userData.velocity);
 
-        // --- CORRECTED Butterfly Flap Animation ---
         const flapCycle = Math.sin(elapsedTime * this.config.wingFlapSpeed + bug.userData.animationOffset);
-        const flapAngle = flapCycle * (this.config.wingFlapAngle / 2); // Flap up and down from center
+        const flapAngle = flapCycle * (this.config.wingFlapAngle / 2);
         
-        // The rotation is now on the Z-axis of the wing's local space.
         bug.userData.wings[0].rotation.z = flapAngle;
         bug.userData.wings[1].rotation.z = -flapAngle;
 
-        // Bounce off walls
         if (Math.abs(bug.position.x) > bounds) bug.userData.velocity.x *= -1;
         if (isFirefly && Math.abs(bug.position.y) > bounds) bug.userData.velocity.y *= -1;
         if (Math.abs(bug.position.z) > bounds) bug.userData.velocity.z *= -1;
