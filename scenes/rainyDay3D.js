@@ -6,9 +6,9 @@ export const rainyDay3D = {
     scene: null,
 
     config: {
-        rainCount: 2000,
-        fallSpeed: 15,
-        rainSize: 0.8,
+        rainCount: 5000,
+        fallSpeed: 25,
+        rainSize: 1.0,
         rippleSpeed: 8,
         rippleSize: 3,
         rainColor: '#aaddff',
@@ -20,52 +20,44 @@ export const rainyDay3D = {
 
     init(scene, renderer) {
         this.scene = scene;
+        this.renderer = renderer; // Store renderer reference
         this.scene.fog = new THREE.Fog(0x000000, 10, 50);
 
         // --- Collision Detection Setup ---
-        // We render the scene from a top-down view to a texture.
-        // The color of each pixel in the texture will store the 3D world position of the surface below it.
+        const rtWidth = 256, rtHeight = 256;
         this.objects.collisionCamera = new THREE.OrthographicCamera(-20, 20, 20, -20, 0.1, 40);
         this.objects.collisionCamera.position.y = 20;
         this.objects.collisionCamera.lookAt(0, 0, 0);
 
-        this.objects.collisionRT = new THREE.WebGLRenderTarget(512, 512, {
+        this.objects.collisionRT = new THREE.WebGLRenderTarget(rtWidth, rtHeight, {
             type: THREE.FloatType,
             minFilter: THREE.NearestFilter,
             magFilter: THREE.NearestFilter,
         });
+        
+        // This buffer will store the collision data read from the GPU
+        this.objects.pixelBuffer = new Float32Array(rtWidth * rtHeight * 4);
 
-        // This special material encodes world position into the RGBA color channels.
         this.objects.positionMaterial = new THREE.ShaderMaterial({
             vertexShader: `varying vec3 vWorldPosition; void main() { vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
             fragmentShader: `varying vec3 vWorldPosition; void main() { gl_FragColor = vec4(vWorldPosition, 1.0); }`
         });
 
-        // --- Rain Particles (as 3D meshes) ---
-        const rainGeo = new THREE.CapsuleGeometry(0.03, 0.5, 4, 8);
+        // --- Rain Particles (Instanced Mesh) ---
+        const rainGeo = new THREE.CylinderGeometry(0.02, 0.02, this.config.rainSize, 5);
         const rainMat = new THREE.MeshBasicMaterial({ color: this.config.rainColor });
         this.objects.rain = new THREE.InstancedMesh(rainGeo, rainMat, this.config.rainCount);
         this.scene.add(this.objects.rain);
 
-        // --- Ripples (with a custom shader) ---
-        const rippleGeo = new THREE.PlaneGeometry(1, 1);
-        const rippleMat = new THREE.ShaderMaterial({
+        // --- Ripples (Instanced Mesh) ---
+        const rippleGeo = new THREE.RingGeometry(0.1, 0.2, 32);
+        const rippleMat = new THREE.MeshBasicMaterial({
+            color: this.config.rippleColor,
+            side: THREE.DoubleSide,
             transparent: true,
-            uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(this.config.rippleColor) } },
-            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-            fragmentShader: `
-                uniform float uTime;
-                uniform vec3 uColor;
-                varying vec2 vUv;
-                void main() {
-                    float dist = distance(vUv, vec2(0.5));
-                    float wave = sin(dist * 20.0 - uTime * 20.0);
-                    float strength = smoothstep(0.5, 0.0, dist);
-                    gl_FragColor = vec4(uColor, wave * strength);
-                }
-            `,
+            opacity: 0.8
         });
-        this.objects.ripples = new THREE.InstancedMesh(rippleGeo, rippleMat, 50); // Pool of 50 ripples
+        this.objects.ripples = new THREE.InstancedMesh(rippleGeo.rotateX(-Math.PI/2), rippleMat, 100);
         this.scene.add(this.objects.ripples);
         
         // --- Scene Objects for Collision ---
@@ -73,7 +65,8 @@ export const rainyDay3D = {
         this.objects.floor.rotation.x = -Math.PI / 2;
         this.scene.add(this.objects.floor);
         
-        this.objects.box = new THREE.Mesh(new THREE.BoxGeometry(5, this.config.boxHeight, 5), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+        this.objects.box = new THREE.Mesh(new THREE.BoxGeometry(5, 1, 5), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+        this.objects.box.scale.y = this.config.boxHeight;
         this.objects.box.position.y = this.config.boxHeight / 2;
         this.scene.add(this.objects.box);
         
@@ -86,6 +79,7 @@ export const rainyDay3D = {
         
         // Initialize particle positions and velocities
         this.objects.velocities = [];
+        this.objects.rippleData = [];
         const dummy = new THREE.Object3D();
         for (let i = 0; i < this.config.rainCount; i++) {
             dummy.position.set((Math.random() - 0.5) * 40, Math.random() * 20, (Math.random() - 0.5) * 40);
@@ -93,41 +87,46 @@ export const rainyDay3D = {
             this.objects.rain.setMatrixAt(i, dummy.matrix);
             this.objects.velocities.push(new THREE.Vector3(0, -this.config.fallSpeed - Math.random() * 5, 0));
         }
+        for (let i = 0; i < 100; i++) {
+            this.objects.rippleData.push({ time: 1000 });
+        }
     },
 
-    update(clock, mouse, camera, renderer) {
-        if (!this.objects.rain) return;
+    update(clock, mouse, camera) {
+        if (!this.objects.rain || !this.renderer) return;
 
         // --- 1. Render Collision Map ---
         this.scene.overrideMaterial = this.objects.positionMaterial;
-        renderer.setRenderTarget(this.objects.collisionRT);
-        renderer.clear();
-        renderer.render(this.scene, this.objects.collisionCamera);
-        renderer.setRenderTarget(null);
+        this.renderer.setRenderTarget(this.objects.collisionRT);
+        this.renderer.clear();
+        this.renderer.render(this.scene, this.objects.collisionCamera);
+        this.renderer.readRenderTargetPixels(this.objects.collisionRT, 0, 0, 256, 256, this.objects.pixelBuffer);
+        this.renderer.setRenderTarget(null);
         this.scene.overrideMaterial = null;
 
         // --- 2. Update Rain and Check for Collisions ---
         const dummy = new THREE.Object3D();
-        const pixelBuffer = new Float32Array(4);
+        const delta = 1 / 60; // Assume 60fps for consistent speed
 
         for (let i = 0; i < this.config.rainCount; i++) {
             this.objects.rain.getMatrixAt(i, dummy.matrix);
-            dummy.position.addScaledVector(this.objects.velocities[i], 1 / 60);
+            dummy.position.addScaledVector(this.objects.velocities[i], delta);
 
-            // Calculate where the raindrop is on our collision texture
-            const u = (dummy.position.x + 20) / 40;
-            const v = (dummy.position.z + 20) / 40;
+            const u = Math.floor(((dummy.position.x + 20) / 40) * 256);
+            const v = Math.floor(((dummy.position.z + 20) / 40) * 256);
+            const pixelIndex = (v * 256 + u) * 4;
 
-            if (u > 0 && u < 1 && v > 0 && v < 1) {
-                renderer.readRenderTargetPixels(this.objects.collisionRT, u * 512, v * 512, 1, 1, pixelBuffer);
-                const hitHeight = pixelBuffer[1];
+            if (pixelIndex >= 0 && pixelIndex < this.objects.pixelBuffer.length) {
+                const hitHeight = this.objects.pixelBuffer[pixelIndex + 1];
 
                 if (dummy.position.y < hitHeight) {
                     this.triggerRipple(new THREE.Vector3(dummy.position.x, hitHeight + 0.01, dummy.position.z));
-                    dummy.position.y = 20; // Reset to top
+                    dummy.position.x = (Math.random() - 0.5) * 40; // Reset with random X/Z
+                    dummy.position.y = 20;
+                    dummy.position.z = (Math.random() - 0.5) * 40;
                 }
             } else if (dummy.position.y < -5) {
-                dummy.position.y = 20; // Reset if it goes way off screen
+                dummy.position.y = 20;
             }
 
             dummy.updateMatrix();
@@ -136,8 +135,18 @@ export const rainyDay3D = {
         this.objects.rain.instanceMatrix.needsUpdate = true;
 
         // --- 3. Animate Ripples ---
-        this.objects.ripples.material.uniforms.uTime.value = clock.getElapsedTime();
-
+        const rippleDummy = new THREE.Object3D();
+        this.objects.rippleData.forEach((data, i) => {
+            if (data.time < this.config.rippleSize) {
+                data.time += delta * this.config.rippleSpeed;
+                rippleDummy.position.copy(data.position);
+                rippleDummy.scale.setScalar(data.time);
+                rippleDummy.updateMatrix();
+                this.objects.ripples.setMatrixAt(i, rippleDummy.matrix);
+            }
+        });
+        this.objects.ripples.instanceMatrix.needsUpdate = true;
+        
         // --- 4. Animate Camera ---
         const time = clock.getElapsedTime() * 0.2;
         camera.position.set(Math.cos(time) * 20, 15, Math.sin(time) * 20);
@@ -146,26 +155,19 @@ export const rainyDay3D = {
 
     triggerRipple(position) {
         if (!this.objects.ripples) return;
-        const dummy = new THREE.Object3D();
         const index = this.objects.nextRippleIndex || 0;
-        
-        dummy.position.copy(position);
-        dummy.scale.set(this.config.rippleSize, this.config.rippleSize, this.config.rippleSize);
-        dummy.updateMatrix();
-        this.objects.ripples.setMatrixAt(index, dummy.matrix);
-        this.objects.ripples.instanceMatrix.needsUpdate = true;
-        
-        this.objects.nextRippleIndex = (index + 1) % 50;
+        this.objects.rippleData[index] = { time: 0, position: position };
+        this.objects.nextRippleIndex = (index + 1) % 100;
     },
 
     destroy() {
         if (!this.scene) return;
         this.scene.traverse(child => {
-            if (child.isMesh || child.isPoints) {
+            if (child.isMesh || child.isPoints || child.isInstancedMesh) {
                 child.geometry.dispose();
                 if (child.material) {
-                    if (child.material.map) child.material.map.dispose();
-                    child.material.dispose();
+                    if(Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
                 }
             }
         });
@@ -191,15 +193,15 @@ export const rainyDay3D = {
         `;
 
         addSliderListeners(this.config, (event) => {
-            if (event && ['rainCount'].includes(event.target.id)) {
+            if (event && (event.target.id === 'rainCount' || event.target.id === 'fallSpeed')) {
                 this.destroy();
                 this.init(this.scene, this.renderer);
             }
         });
-
+        
         addColorListeners(this.config, (key, value) => {
             if (key === 'rainColor' && this.objects.rain) this.objects.rain.material.color.set(value);
-            if (key === 'rippleColor' && this.objects.ripples) this.objects.ripples.material.uniforms.uColor.value.set(value);
+            if (key === 'rippleColor' && this.objects.ripples) this.objects.ripples.material.color.set(value);
         });
 
         // Add direct listeners for properties that can be updated in real-time
@@ -209,6 +211,13 @@ export const rainyDay3D = {
                 this.objects.box.scale.y = this.config.boxHeight;
                 this.objects.box.position.y = this.config.boxHeight / 2;
             }
+        });
+         document.getElementById('rainSize').addEventListener('input', (e) => {
+            this.config.rainSize = parseFloat(e.target.value);
+             if (this.objects.rain) {
+                this.objects.rain.geometry.dispose();
+                this.objects.rain.geometry = new THREE.CylinderGeometry(0.02, 0.02, this.config.rainSize, 5);
+             }
         });
     }
 };
