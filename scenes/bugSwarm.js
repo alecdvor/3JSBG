@@ -12,8 +12,8 @@ export const bugSwarm = {
         roachSpeed: 0.05,
         fireflyLightIntensity: 2.0,
         fireflyColor: '#ffffaa',
-        wingFlapSpeed: 15,
-        wingFlapAngle: 1.2, // New: Controls the range of the wing flap
+        wingFlapSpeed: 25,
+        wingFlapAngle: 1.4, 
         bounds: 10,
     },
 
@@ -28,12 +28,13 @@ export const bugSwarm = {
         this.objects.roaches = new THREE.Group();
         this.scene.add(this.objects.roaches);
 
-        // --- Shared Wing Geometry and Material ---
+        // --- CORRECTED Wing Geometry ---
+        // The corner at (0,0,0) is now the attachment point.
         const wingGeo = new THREE.BufferGeometry();
         const wingVertices = new Float32Array([
-            0, 0, -0.1,  // A: attachment point
-            0, 0, 0.2,   // B: wing tip 1
-            0.15, 0, 0.1, // C: wing tip 2
+            0, 0, 0,    // Attachment point
+            0, 0.05, 0.3,  // Upper wing tip
+            0, -0.05, 0.3 // Lower wing tip
         ]);
         wingGeo.setAttribute('position', new THREE.BufferAttribute(wingVertices, 3));
         wingGeo.computeVertexNormals();
@@ -58,7 +59,7 @@ export const bugSwarm = {
 
             const rightWing = new THREE.Mesh(wingGeo, wingMat);
             rightWing.position.set(-0.05, 0, 0);
-            rightWing.rotation.y = Math.PI; // Flip the wing
+            rightWing.scale.x = -1; // Flip the wing
             firefly.add(rightWing);
             
             firefly.userData.wings = [leftWing, rightWing];
@@ -70,7 +71,7 @@ export const bugSwarm = {
             );
 
             firefly.userData.velocity = new THREE.Vector3().randomDirection().multiplyScalar(this.config.fireflySpeed);
-            firefly.userData.blinkOffset = Math.random() * Math.PI * 2;
+            firefly.userData.animationOffset = Math.random() * Math.PI * 2;
             
             this.objects.fireflies.add(firefly);
         }
@@ -88,14 +89,14 @@ export const bugSwarm = {
             roach.add(body);
 
             const leftWing = new THREE.Mesh(wingGeo, wingMat);
-            leftWing.scale.set(1.5, 1.5, 1.5);
+            leftWing.scale.set(1.5, 1, 1.5);
             leftWing.position.set(0.1, 0.05, 0); 
             roach.add(leftWing);
 
             const rightWing = new THREE.Mesh(wingGeo, wingMat);
-            rightWing.scale.set(1.5, 1.5, 1.5);
+            rightWing.scale.set(1.5, 1, 1.5);
             rightWing.position.set(-0.1, 0.05, 0);
-            rightWing.rotation.y = Math.PI;
+            rightWing.scale.x = -1;
             roach.add(rightWing);
 
             roach.userData.wings = [leftWing, rightWing];
@@ -107,7 +108,8 @@ export const bugSwarm = {
             );
 
             roach.userData.velocity = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize().multiplyScalar(this.config.roachSpeed);
-            
+            roach.userData.animationOffset = Math.random() * Math.PI * 2;
+
             this.objects.roaches.add(roach);
         }
         
@@ -117,56 +119,44 @@ export const bugSwarm = {
 
     update(clock) {
         const elapsedTime = clock.getElapsedTime();
-        const bounds = this.config.bounds / 2;
-
-        // --- Animate Bugs ---
         this.objects.fireflies.children.forEach(bug => this.animateBug(bug, elapsedTime, true));
         this.objects.roaches.children.forEach(bug => this.animateBug(bug, elapsedTime, false));
     },
 
     animateBug(bug, elapsedTime, isFirefly) {
         const bounds = this.config.bounds / 2;
-
         bug.position.add(bug.userData.velocity);
 
-        // --- NEW: Butterfly Flap Animation ---
-        const flapCycle = Math.sin(elapsedTime * this.config.wingFlapSpeed + bug.userData.blinkOffset);
-        const flapAngle = (flapCycle * 0.5 + 0.5) * this.config.wingFlapAngle; // Flap from 0 to max angle
-        const oscillation = Math.cos(elapsedTime * this.config.wingFlapSpeed * 0.5 + bug.userData.blinkOffset) * 0.2; // Slower side-to-side rotation
-
-        bug.userData.wings[0].rotation.x = flapAngle;
-        bug.userData.wings[1].rotation.x = flapAngle;
-        bug.userData.wings[0].rotation.z = oscillation;
-        bug.userData.wings[1].rotation.z = -oscillation;
+        // --- CORRECTED Butterfly Flap Animation ---
+        const flapCycle = Math.sin(elapsedTime * this.config.wingFlapSpeed + bug.userData.animationOffset);
+        const flapAngle = flapCycle * (this.config.wingFlapAngle / 2); // Flap up and down from center
+        
+        // The rotation is now on the Z-axis of the wing's local space.
+        bug.userData.wings[0].rotation.z = flapAngle;
+        bug.userData.wings[1].rotation.z = -flapAngle;
 
         // Bounce off walls
         if (Math.abs(bug.position.x) > bounds) bug.userData.velocity.x *= -1;
         if (isFirefly && Math.abs(bug.position.y) > bounds) bug.userData.velocity.y *= -1;
         if (Math.abs(bug.position.z) > bounds) bug.userData.velocity.z *= -1;
         
-        // Orient bug to its direction of travel
         bug.lookAt(bug.position.clone().add(bug.userData.velocity));
 
         if (isFirefly) {
-            // Blink the light
-            bug.children[1].intensity = (Math.sin(elapsedTime * 3 + bug.userData.blinkOffset) * 0.5 + 0.5) * this.config.fireflyLightIntensity;
+            bug.children[1].intensity = (Math.sin(elapsedTime * 3 + bug.userData.animationOffset) * 0.5 + 0.5) * this.config.fireflyLightIntensity;
         } else {
-            // Keep roaches on the floor
             bug.position.y = (-bounds) + 0.1;
         }
     },
 
     destroy() {
         if (!this.scene) return;
-        
-        // Simplified disposal
         this.scene.traverse(child => {
             if (child.isMesh) {
                 child.geometry.dispose();
                 child.material.dispose();
             }
         });
-
         this.scene.remove(this.objects.fireflies);
         this.scene.remove(this.objects.roaches);
         this.scene.remove(this.objects.ambientLight);
@@ -199,13 +189,12 @@ export const bugSwarm = {
         addColorListeners(this.config, (key, value) => {
             if (key === 'fireflyColor') {
                 this.objects.fireflies.children.forEach(firefly => {
-                    firefly.children[0].material.color.set(value); // Body
-                    firefly.children[1].color.set(value); // Light
+                    firefly.children[0].material.color.set(value);
+                    firefly.children[1].color.set(value);
                 });
             }
         });
         
-        // Add direct listeners for properties that don't require a scene rebuild
         ['fireflyLightIntensity', 'wingFlapSpeed', 'wingFlapAngle'].forEach(id => {
             document.getElementById(id).addEventListener('input', (e) => {
                 this.config[id] = parseFloat(e.target.value);
