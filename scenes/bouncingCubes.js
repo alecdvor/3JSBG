@@ -9,7 +9,8 @@ export const bouncingCubes = {
         cubeCount: 50,
         maxSpeed: 0.02,
         maxSize: 0.8,
-        bounds: 8, // The size of the invisible containing box
+        spinStrength: 0.05, // New: Controls how fast cubes spin after a bounce
+        bounds: 8,
     },
 
     objects: {},
@@ -33,6 +34,13 @@ export const bouncingCubes = {
 
             const cube = new THREE.Mesh(geometry, material);
             cube.scale.set(size, size, size);
+            
+            // --- NEW: Set a random initial rotation ---
+            cube.rotation.set(
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
+            );
 
             cube.position.set(
                 (Math.random() - 0.5) * this.config.bounds,
@@ -45,6 +53,9 @@ export const bouncingCubes = {
                 (Math.random() - 0.5) * this.config.maxSpeed,
                 (Math.random() - 0.5) * this.config.maxSpeed
             );
+            
+            // --- NEW: Add a property to store the cube's spin ---
+            cube.userData.angularVelocity = new THREE.Vector3(0, 0, 0);
             
             this.objects.cubeGroup.add(cube);
         }
@@ -64,23 +75,30 @@ export const bouncingCubes = {
         const bounds = this.config.bounds / 2;
 
         this.objects.cubeGroup.children.forEach(cube => {
-            // Move the cube first
+            // Apply movement
             cube.position.add(cube.userData.velocity);
+            
+            // --- NEW: Apply continuous rotation ---
+            cube.rotation.x += cube.userData.angularVelocity.x;
+            cube.rotation.y += cube.userData.angularVelocity.y;
+            cube.rotation.z += cube.userData.angularVelocity.z;
 
-            // --- CORRECTED Bounce and Color Change Logic ---
+            // Bounce and Color Change Logic
             ['x', 'y', 'z'].forEach(axis => {
                 const halfSize = cube.scale[axis] / 2;
                 
-                // Check positive boundary collision
-                if (cube.position[axis] + halfSize > bounds && cube.userData.velocity[axis] > 0) {
-                    cube.userData.velocity[axis] *= -1; // Reverse direction
+                if ((cube.position[axis] + halfSize > bounds && cube.userData.velocity[axis] > 0) ||
+                    (cube.position[axis] - halfSize < -bounds && cube.userData.velocity[axis] < 0)) {
+                    
+                    cube.userData.velocity[axis] *= -1;
                     cube.material.color.setRGB(Math.random(), Math.random(), Math.random());
-                }
-                
-                // Check negative boundary collision
-                if (cube.position[axis] - halfSize < -bounds && cube.userData.velocity[axis] < 0) {
-                    cube.userData.velocity[axis] *= -1; // Reverse direction
-                    cube.material.color.setRGB(Math.random(), Math.random(), Math.random());
+
+                    // --- NEW: Set a new random angular velocity on bounce ---
+                    cube.userData.angularVelocity.set(
+                        (Math.random() - 0.5) * this.config.spinStrength,
+                        (Math.random() - 0.5) * this.config.spinStrength,
+                        (Math.random() - 0.5) * this.config.spinStrength
+                    );
                 }
             });
         });
@@ -108,6 +126,7 @@ export const bouncingCubes = {
             ${createSlider('cubeCount', 'Count', 10, 200, this.config.cubeCount, '1')}
             ${createSlider('maxSpeed', 'Max Speed', 0.01, 0.1, this.config.maxSpeed, '0.001')}
             ${createSlider('maxSize', 'Max Size', 0.2, 2, this.config.maxSize, '0.1')}
+            ${createSlider('spinStrength', 'Spin Strength', 0, 0.2, this.config.spinStrength, '0.01')}
         `;
 
         addSliderListeners(this.config, (event) => {
