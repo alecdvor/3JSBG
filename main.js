@@ -2,13 +2,13 @@ import * as THREE from 'three';
 
 let scene, camera, renderer;
 let activeSceneUpdater = null;
-let activeSceneName = ''; // Keep track of the current scene's name
+let activeSceneName = '';
 const mouse = new THREE.Vector2();
 const clock = new THREE.Clock();
 const loadedScenes = {};
-const defaultConfigs = {}; // Store default configs for comparison
+const defaultConfigs = {};
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js']; // add new scenes in the scenes directory to this line to expose it to the scene selector.
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js'];
 
 async function init() {
     scene = new THREE.Scene();
@@ -35,27 +35,28 @@ async function init() {
         document.querySelector('.content').classList.toggle('hidden');
     });
     
+    // Controls Panel Hide/Show
     const controlsPanel = document.getElementById('controls');
     const hideControlsBtn = document.getElementById('hideControlsBtn');
     const showControlsBtn = document.getElementById('showControlsBtn');
     hideControlsBtn.addEventListener('click', () => { controlsPanel.classList.add('hidden'); showControlsBtn.classList.add('visible'); });
     showControlsBtn.addEventListener('click', () => { controlsPanel.classList.remove('hidden'); showControlsBtn.classList.remove('visible'); });
 
-    const selectorPanel = document.getElementById('scene-selector');
-    const hideSelectorBtn = document.getElementById('hideSelectorBtn');
-    const showSelectorBtn = document.getElementById('showSelectorBtn');
-    hideSelectorBtn.addEventListener('click', () => { selectorPanel.classList.add('hidden'); showSelectorBtn.classList.add('visible'); });
-    showSelectorBtn.addEventListener('click', () => { selectorPanel.classList.remove('hidden'); showSelectorBtn.classList.remove('visible'); });
+    // Scene Selector Modal
+    const sceneModal = document.getElementById('scene-selector-modal');
+    document.getElementById('open-scene-modal-btn').addEventListener('click', () => sceneModal.classList.add('visible'));
+    document.getElementById('close-scene-modal-btn').addEventListener('click', () => sceneModal.classList.remove('visible'));
     
+    // Code Exporter Modal
     document.getElementById('generateCodeBtn').addEventListener('click', generateEmbedCode);
-
     const codeModal = document.getElementById('code-modal');
-    document.getElementById('close-modal-btn').addEventListener('click', () => codeModal.classList.remove('visible'));
+    document.getElementById('close-code-modal-btn').addEventListener('click', () => codeModal.classList.remove('visible'));
     document.getElementById('copy-code-btn').addEventListener('click', copyEmbedCode);
 }
 
 async function loadScenesAndBuildUI() {
     const container = document.getElementById('scene-buttons-container');
+    const sceneModal = document.getElementById('scene-selector-modal');
     
     for (const fileName of sceneFiles) {
         const sceneName = fileName.replace('.js', '');
@@ -64,14 +65,16 @@ async function loadScenesAndBuildUI() {
             
             if (module[sceneName]) {
                 loadedScenes[sceneName] = module[sceneName];
-                // Store a deep copy of the default config
                 defaultConfigs[sceneName] = JSON.parse(JSON.stringify(module[sceneName].config));
                 
                 const btn = document.createElement('button');
                 btn.className = 'scene-btn';
                 btn.dataset.scene = sceneName;
                 btn.textContent = module[sceneName].title || sceneName;
-                btn.onclick = () => switchScene(sceneName);
+                btn.onclick = () => {
+                    switchScene(sceneName);
+                    sceneModal.classList.remove('visible'); // Close modal on selection
+                };
                 container.appendChild(btn);
             }
         } catch (error) {
@@ -85,7 +88,6 @@ function switchScene(sceneName) {
         activeSceneUpdater.destroy(scene);
     }
 
-    // Reset scene config to its default before initializing
     loadedScenes[sceneName].config = JSON.parse(JSON.stringify(defaultConfigs[sceneName]));
     
     camera.position.set(0,0,1);
@@ -103,18 +105,15 @@ function switchScene(sceneName) {
     activeSceneUpdater.init(scene);
     activeSceneUpdater.createControls(scene);
 
-    document.querySelectorAll('.scene-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`.scene-btn[data-scene="${sceneName}"]`).classList.add('active');
+    document.querySelectorAll('#scene-buttons-container .scene-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`#scene-buttons-container .scene-btn[data-scene="${sceneName}"]`).classList.add('active');
     document.getElementById('controls-title').textContent = `Customize ${activeSceneUpdater.title}`;
 }
 
 function generateEmbedCode() {
     if (!activeSceneUpdater) return;
 
-    // Get the complete current configuration object.
     const currentConfig = activeSceneUpdater.config;
-    
-    // The config string now includes all properties, not just customized ones.
     const configString = Object.keys(currentConfig).length > 0 
         ? `\n  config: ${JSON.stringify(currentConfig, null, 2)}\n` 
         : '';
@@ -129,8 +128,7 @@ function generateEmbedCode() {
     target: '#my-background',${configString}});
 <\/script>`;
 
-    const codeTextarea = document.getElementById('embed-code');
-    codeTextarea.value = embedCode;
+    document.getElementById('embed-code').value = embedCode;
     document.getElementById('code-modal').classList.add('visible');
 }
 
@@ -140,9 +138,7 @@ function copyEmbedCode() {
     
     navigator.clipboard.writeText(codeTextarea.value).then(() => {
         copyButton.textContent = 'Copied!';
-        setTimeout(() => {
-            copyButton.textContent = 'Copy to Clipboard';
-        }, 2000);
+        setTimeout(() => { copyButton.textContent = 'Copy to Clipboard'; }, 2000);
     }).catch(err => {
         copyButton.textContent = 'Failed to copy';
         console.error('Failed to copy code: ', err);
@@ -153,7 +149,7 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    if (activeSceneUpdater && activeSceneUpdater.onWindowResize) { // Check if scene has this method
+    if (activeSceneUpdater && activeSceneUpdater.onWindowResize) {
         activeSceneUpdater.onWindowResize(window.innerWidth, window.innerHeight);
     }
 }
