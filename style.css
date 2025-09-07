@@ -38,64 +38,75 @@ body {
     margin-top: 10px;
     color: #ccc;
 }
-/* --- Scene Selector Styles --- */
-#scene-selector {
+
+/* --- MODAL STYLES --- */
+.modal-overlay {
     position: fixed;
-    bottom: 20px;
-    left: 50%;
-    background: rgba(30, 30, 40, 0.8);
-    padding: 15px;
-    border-radius: 15px;
-    z-index: 100;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
     backdrop-filter: blur(5px);
+}
+.modal-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+.modal-content {
+    background: rgba(40, 40, 50, 0.9);
+    padding: 30px;
+    border-radius: 15px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    transform: translateX(-50%);
-    min-width: 250px; /* Ensure a consistent width for transition calculation */
-    box-sizing: border-box;
+    width: 90%;
+    max-width: 700px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
 }
-#scene-selector.hidden {
-    transform: translateX(-50%) translateY(calc(100% + 40px));
+.modal-overlay.visible .modal-content {
+    transform: scale(1);
 }
-.selector-header {
+.modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
-    padding-bottom: 10px;
+    padding-bottom: 15px;
 }
-.selector-header h3 {
+.modal-header h2 {
     margin: 0;
-    text-align: center;
-    font-size: 1rem;
-    color: #ccc;
-    font-weight: 400;
+    font-size: 1.5rem;
 }
-.scene-btn {
-    background: #444;
-    border: 1px solid #666;
-    color: white;
-    padding: 8px 15px;
-    margin: 5px;
-    border-radius: 8px;
+.close-modal-btn {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 2rem;
+    line-height: 1;
     cursor: pointer;
-    transition: background-color 0.3s, border-color 0.3s;
-    font-size: 0.9rem;
+    transition: color 0.2s;
 }
-.scene-btn:hover {
-    background-color: #555;
-    border-color: #888;
+.close-modal-btn:hover {
+    color: white;
 }
-.scene-btn.active {
-    background-color: #4A90E2;
-    border-color: #4A90E2;
+
+/* --- Scene Selector Modal Specific Styles --- */
+#scene-selector-modal .modal-content {
+    max-width: 500px;
 }
-#ui-toggles {
-    margin-top: 10px;
-}
-#toggleContentBtn {
-    width: 100%;
+#scene-buttons-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 /* --- Controls Panel Styles --- */
@@ -125,12 +136,7 @@ body {
     padding-bottom: 15px;
     margin-bottom: 15px;
 }
-.controls-header h2 {
-    margin: 0;
-    padding: 0;
-    border: none;
-    font-size: 1.2rem;
-}
+.controls-header h2 { margin: 0; padding: 0; border: none; font-size: 1.2rem; }
 .hide-btn {
     background: none; border: none; color: #aaa; font-size: 1.8rem;
     line-height: 1; cursor: pointer; padding: 0 5px; transition: color 0.2s;
@@ -144,144 +150,27 @@ body {
     transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     opacity: 0; transform: scale(0); pointer-events: none;
 }
-.show-btn.visible { opacity: 1; transform: scale(1); pointer-events: auto; }
-#showControlsBtn { right: 20px; }
-#showSelectorBtn { left: 50%; margin-left: -25px; }
-
-.control-row {
-    margin-bottom: 15px; display: grid;
-    grid-template-columns: 100px 1fr 60px; 
-    align-items: center; gap: 10px;
-}
-.control-row label { font-size: 0.9rem; }
-.control-row input[type="range"] { width: 100%; }
-
-.control-row span, .control-row input[type="text"], .control-row input[type="color"] {
-    text-align: right; font-size: 0.9rem;
-    background: #222; padding: 5px; border-radius: 4px;
-    color: #eee;
-    border: 1px solid #444;
-    box-sizing: border-box;
-}
-.control-row input[type="text"] {
-    width: 100%;
-    font-family: 'Inter', sans-serif;
-}
-.control-row input[type="color"] { 
-    padding: 0; border: none; width: 30px; height: 30px; 
-}
-
-#generateCodeBtn, #copyCodeBtn {
-    width: 100%;
-    padding: 10px;
-    background: #4A90E2;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 1rem;
-    cursor: pointer;
-    margin-top: 10px;
-}
-#code-output-container {
-    margin-top: 20px;
-    display: none;
-}
-#code-output {
-    width: 100%;
-    height: 150px;
-    background: #111;
-    border: 1px solid #444;
-    border-radius: 8px;
-    color: #eee;
-    font-family: monospace;
-    box-sizing: border-box;
-    resize: vertical;
-}
-
-/* --- Generate Code Modal Styles --- */
-#code-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-}
-#code-modal.visible {
+#open-scene-modal-btn {
+    left: 20px;
     opacity: 1;
+    transform: scale(1);
     pointer-events: auto;
 }
-.modal-content {
-    background: rgba(40, 40, 50, 0.9);
-    padding: 30px;
-    border-radius: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    width: 90%;
-    max-width: 700px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    backdrop-filter: blur(10px);
-    transform: scale(0.95);
-    transition: transform 0.3s ease;
-}
-#code-modal.visible .modal-content {
-    transform: scale(1);
-}
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    padding-bottom: 15px;
-}
-.modal-header h2 {
-    margin: 0;
-    font-size: 1.5rem;
-}
-#close-modal-btn {
-    background: none;
-    border: none;
-    color: #aaa;
-    font-size: 2rem;
-    line-height: 1;
-    cursor: pointer;
-    transition: color 0.2s;
-}
-#close-modal-btn:hover {
-    color: white;
-}
-#embed-code {
-    width: 100%;
-    height: 250px;
-    background: #111;
-    border: 1px solid #444;
-    border-radius: 8px;
-    color: #eee;
-    font-family: monospace;
-    font-size: 0.9rem;
-    padding: 15px;
-    box-sizing: border-box;
-    resize: vertical;
-}
-#copy-code-btn {
-    width: 100%;
-    padding: 12px;
-    background: #4A90E2;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 1rem;
-    cursor: pointer;
-    margin-top: 15px;
-    transition: background-color 0.2s;
-}
-#copy-code-btn:hover {
-    background-color: #357ABD;
-}
+.show-btn.visible { opacity: 1; transform: scale(1); pointer-events: auto; }
+#showControlsBtn { right: 20px; }
+
+/* ... (rest of styles remain the same) ... */
+.scene-btn { background: #444; border: 1px solid #666; color: white; padding: 8px 15px; margin: 5px; border-radius: 8px; cursor: pointer; transition: background-color 0.3s, border-color 0.3s; font-size: 0.9rem; }
+.scene-btn:hover { background-color: #555; border-color: #888; }
+.scene-btn.active { background-color: #4A90E2; border-color: #4A90E2; }
+#toggleContentBtn { width: 100%; margin-top: 15px; }
+.control-row { margin-bottom: 15px; display: grid; grid-template-columns: 100px 1fr 60px; align-items: center; gap: 10px; }
+.control-row label { font-size: 0.9rem; }
+.control-row input[type="range"] { width: 100%; }
+.control-row span, .control-row input[type="text"], .control-row input[type="color"] { text-align: right; font-size: 0.9rem; background: #222; padding: 5px; border-radius: 4px; color: #eee; border: 1px solid #444; box-sizing: border-box; }
+.control-row input[type="text"] { width: 100%; font-family: 'Inter', sans-serif; }
+.control-row input[type="color"] { padding: 0; border: none; width: 30px; height: 30px; }
+#generateCodeBtn { width: 100%; padding: 10px; background: #4A90E2; border: none; border-radius: 8px; color: white; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+#embed-code { width: 100%; height: 250px; background: #111; border: 1px solid #444; border-radius: 8px; color: #eee; font-family: monospace; font-size: 0.9rem; padding: 15px; box-sizing: border-box; resize: vertical; }
+#copy-code-btn { width: 100%; padding: 12px; background: #4A90E2; border: none; border-radius: 8px; color: white; font-size: 1rem; cursor: pointer; margin-top: 15px; transition: background-color 0.2s; }
+#copy-code-btn:hover { background-color: #357ABD; }
