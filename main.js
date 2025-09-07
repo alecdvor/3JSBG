@@ -8,8 +8,8 @@ const clock = new THREE.Clock();
 const loadedScenes = {};
 const defaultConfigs = {};
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 
-                    'bugSwarm.js', 'oceanView.js', 'colorCloud.js', 'gravityParticles.js', 'fluidParticles.js', 'rainyDay3D.js'];
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 
+                    'candyField.js', 'bugSwarm.js', 'oceanView.js', 'colorCloud.js', 'gravityParticles.js', 'fluidParticles.js', 'rainyDay3D.js'];
 
 async function init() {
     scene = new THREE.Scene();
@@ -153,7 +153,8 @@ function onMouseMove(event) {
 function animate() {
     requestAnimationFrame(animate);
     if (activeSceneUpdater) {
-        activeSceneUpdater.update(clock, mouse, camera);
+        // --- FIX: Pass the renderer to the update function ---
+        activeSceneUpdater.update(clock, mouse, camera, renderer);
     }
     renderer.render(scene, camera);
 }
