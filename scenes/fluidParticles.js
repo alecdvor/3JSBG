@@ -71,7 +71,14 @@ export const fluidParticles = {
     update(clock, mouse, camera) {
         if (!this.objects.particles) return;
 
-        camera.position.z = 10;
+        // --- CORRECTED Camera Position ---
+        // Set an angled 3D perspective and have it gently orbit.
+        const time = clock.getElapsedTime() * 0.1;
+        camera.position.set(
+            Math.cos(time) * 10,
+            5,
+            Math.sin(time) * 10
+        );
         camera.lookAt(this.scene.position);
 
         this.objects.raycaster.setFromCamera(mouse, camera);
