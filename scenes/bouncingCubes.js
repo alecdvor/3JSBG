@@ -17,7 +17,6 @@ export const bouncingCubes = {
     init(scene) {
         this.scene = scene;
         
-        // Use a group to hold all the cubes for easy management
         this.objects.cubeGroup = new THREE.Group();
         this.scene.add(this.objects.cubeGroup);
 
@@ -35,7 +34,6 @@ export const bouncingCubes = {
             const cube = new THREE.Mesh(geometry, material);
             cube.scale.set(size, size, size);
 
-            // Give each cube a random position and velocity
             cube.position.set(
                 (Math.random() - 0.5) * this.config.bounds,
                 (Math.random() - 0.5) * this.config.bounds,
@@ -51,31 +49,36 @@ export const bouncingCubes = {
             this.objects.cubeGroup.add(cube);
         }
 
-        // Add some ambient light to see the cubes
         this.objects.ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(this.objects.ambientLight);
 
-        // Add a directional light for better shading
         this.objects.dirLight = new THREE.DirectionalLight(0xffffff, 1);
         this.objects.dirLight.position.set(5, 10, 7.5);
         this.scene.add(this.objects.dirLight);
     },
 
     update(clock, mouse, camera) {
-        // Gently rotate the entire group of cubes for a nice effect
         this.objects.cubeGroup.rotation.y += 0.0005;
         this.objects.cubeGroup.rotation.x += 0.0002;
 
         const bounds = this.config.bounds / 2;
 
         this.objects.cubeGroup.children.forEach(cube => {
-            // Move the cube
+            // Move the cube first
             cube.position.add(cube.userData.velocity);
 
-            // Bounce off the walls and change color
+            // --- CORRECTED Bounce and Color Change Logic ---
             ['x', 'y', 'z'].forEach(axis => {
                 const halfSize = cube.scale[axis] / 2;
-                if (cube.position[axis] + halfSize > bounds || cube.position[axis] - halfSize < -bounds) {
+                
+                // Check positive boundary collision
+                if (cube.position[axis] + halfSize > bounds && cube.userData.velocity[axis] > 0) {
+                    cube.userData.velocity[axis] *= -1; // Reverse direction
+                    cube.material.color.setRGB(Math.random(), Math.random(), Math.random());
+                }
+                
+                // Check negative boundary collision
+                if (cube.position[axis] - halfSize < -bounds && cube.userData.velocity[axis] < 0) {
                     cube.userData.velocity[axis] *= -1; // Reverse direction
                     cube.material.color.setRGB(Math.random(), Math.random(), Math.random());
                 }
@@ -86,7 +89,6 @@ export const bouncingCubes = {
     destroy() {
         if (!this.scene) return;
         
-        // Dispose of geometries and materials to prevent memory leaks
         this.objects.cubeGroup.children.forEach(cube => {
             cube.geometry.dispose();
             cube.material.dispose();
@@ -109,7 +111,6 @@ export const bouncingCubes = {
         `;
 
         addSliderListeners(this.config, (event) => {
-            // If the cube count changes, we need to rebuild the whole scene
             if (event && event.target.id === 'cubeCount') {
                 this.destroy();
                 this.init(this.scene);
