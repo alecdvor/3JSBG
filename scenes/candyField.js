@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createSlider, addSliderListeners } from '../utils.js';
+import { createSlider, addSliderListeners } from '../utils.js'; 
 
 export const candyField = {
     title: "Candy Field",
