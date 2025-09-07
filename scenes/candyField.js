@@ -1,5 +1,34 @@
 import * as THREE from 'three';
-import { createSlider, addSliderListeners } from '../utils.js'; 
+import { createSlider, addSliderListeners } from '../utils.js';
+
+/**
+ * NEW: Helper function to manually create a twisted box geometry.
+ * @param {number} width - The width of the box.
+ * @param {number} height - The height of the box.
+ * @param {number} depth - The depth of the box.
+ * @param {number} twistAngle - The angle in radians to twist the box.
+ * @returns {THREE.BoxGeometry} The modified geometry.
+ */
+function createTwistedBoxGeometry(width = 1, height = 1, depth = 1, twistAngle = Math.PI / 4) {
+    const geometry = new THREE.BoxGeometry(width, height, depth, 10, 10, 10);
+    const positionAttribute = geometry.attributes.position;
+    const quaternion = new THREE.Quaternion();
+    const vertex = new THREE.Vector3();
+
+    for (let i = 0; i < positionAttribute.count; i++) {
+        vertex.fromBufferAttribute(positionAttribute, i);
+        
+        // Calculate the twist based on the vertex's height
+        const angle = (vertex.y / height) * twistAngle;
+        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+        vertex.applyQuaternion(quaternion);
+        
+        positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    }
+    
+    geometry.computeVertexNormals();
+    return geometry;
+}
 
 export const candyField = {
     title: "Candy Field",
@@ -22,13 +51,13 @@ export const candyField = {
 
         // --- Create a variety of candy geometries ---
         const geometries = [
-            new THREE.SphereGeometry(0.5, 16, 16),      // Gumball
-            new THREE.CapsuleGeometry(0.3, 0.8, 4, 8), // Pill-shaped candy
-            new THREE.TorusGeometry(0.4, 0.15, 8, 24),   // Gummy ring
-            new THREE.BoxGeometry(1, 1, 1).twist(Math.PI / 4), // Wrapped candy
+            new THREE.SphereGeometry(0.5, 32, 16),      // Gumball
+            new THREE.CapsuleGeometry(0.3, 0.8, 8, 16), // Pill-shaped candy
+            new THREE.TorusGeometry(0.4, 0.15, 16, 32),   // Gummy ring
+            createTwistedBoxGeometry(1, 1, 1, Math.PI / 4), // Wrapped candy
         ];
 
-        const candyColors = [0xff80ab, 0x80d8ff, 0xa5d6a7, 0xffd54f, 0xb39ddb];
+        const candyColors = [0xff80ab, 0x80d8ff, 0xa5d6a7, 0xffd54f, 0xb39ddb, 0xffab40];
 
         for (let i = 0; i < this.config.candyCount; i++) {
             const geometry = geometries[Math.floor(Math.random() * geometries.length)];
@@ -40,19 +69,16 @@ export const candyField = {
 
             const candy = new THREE.Mesh(geometry, material);
             
-            // Randomize scale and orientation
             const scale = Math.random() * 0.5 + 0.3;
             candy.scale.set(scale, scale, scale);
             candy.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
 
-            // Set random position within the field
             candy.position.set(
                 (Math.random() - 0.5) * this.config.fieldSize,
                 (Math.random() - 0.5) * this.config.fieldSize,
                 (Math.random() - 0.5) * this.config.fieldSize
             );
 
-            // Add physics properties
             candy.userData.velocity = new THREE.Vector3(
                 (Math.random() - 0.5) * this.config.maxSpeed,
                 (Math.random() - 0.5) * this.config.maxSpeed,
@@ -79,13 +105,11 @@ export const candyField = {
         const bounds = this.config.fieldSize / 2;
 
         this.objects.candyGroup.children.forEach(candy => {
-            // Apply movement and rotation
             candy.position.add(candy.userData.velocity);
             candy.rotation.x += candy.userData.angularVelocity.x;
             candy.rotation.y += candy.userData.angularVelocity.y;
             candy.rotation.z += candy.userData.angularVelocity.z;
 
-            // Simple bounds check to wrap around the field
             ['x', 'y', 'z'].forEach(axis => {
                 if (candy.position[axis] > bounds) candy.position[axis] = -bounds;
                 if (candy.position[axis] < -bounds) candy.position[axis] = bounds;
