@@ -23,7 +23,6 @@ export const fluidParticles = {
         this.objects.raycaster = new THREE.Raycaster();
         this.objects.mousePosition3D = new THREE.Vector3();
         
-        // Invisible sphere for mouse raycasting
         this.objects.interactionSphere = new THREE.Mesh(
             new THREE.SphereGeometry(this.config.bounds, 32, 32),
             new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
@@ -72,7 +71,9 @@ export const fluidParticles = {
     update(clock, mouse, camera) {
         if (!this.objects.particles) return;
 
-        // Update mouse position
+        camera.position.z = 10;
+        camera.lookAt(this.scene.position);
+
         this.objects.raycaster.setFromCamera(mouse, camera);
         const intersects = this.objects.raycaster.intersectObject(this.objects.interactionSphere);
         if (intersects.length > 0) {
@@ -89,8 +90,6 @@ export const fluidParticles = {
             const i3 = i * 3;
             particlePos.fromArray(positions, i3);
             
-            // --- Physics ---
-            // Mouse interaction
             force.subVectors(this.objects.mousePosition3D, particlePos);
             const dist = force.length();
             if (dist < 2) {
@@ -100,23 +99,19 @@ export const fluidParticles = {
                 velocities[i3 + 2] += force.z;
             }
             
-            // Gravity towards the center
             force.copy(particlePos).normalize().multiplyScalar(this.config.gravity);
             velocities[i3] += force.x;
             velocities[i3 + 1] += force.y;
             velocities[i3 + 2] += force.z;
             
-            // Update position
             positions[i3] += velocities[i3];
             positions[i3 + 1] += velocities[i3 + 1];
             positions[i3 + 2] += velocities[i3 + 2];
 
-            // Apply viscosity (drag)
             velocities[i3] *= (1 - this.config.viscosity);
             velocities[i3 + 1] *= (1 - this.config.viscosity);
             velocities[i3 + 2] *= (1 - this.config.viscosity);
 
-            // Boundary condition (contain within a sphere)
             const len = particlePos.length();
             if (len > this.config.bounds) {
                 particlePos.normalize().multiplyScalar(this.config.bounds);
