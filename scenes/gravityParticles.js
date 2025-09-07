@@ -21,8 +21,6 @@ export const gravityParticles = {
     init(scene) {
         this.scene = scene;
         
-        // --- Invisible Plane for Mouse Interaction ---
-        // This plane is used by the raycaster to determine the 3D position of the mouse.
         this.objects.interactionPlane = new THREE.Mesh(
             new THREE.PlaneGeometry(100, 100),
             new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
@@ -55,12 +53,11 @@ export const gravityParticles = {
         for (let i = 0; i < this.config.particleCount; i++) {
             const i3 = i * 3;
             
-            // Arrange particles in a grid, similar to the example
             const x = (i % amount) * separation - offset;
             const z = Math.floor(i / amount) * separation - offset;
 
             positions[i3] = x;
-            positions[i3 + 1] = Math.random() * 5 + 2; // Start above the floor
+            positions[i3 + 1] = Math.random() * 5 + 2;
             positions[i3 + 2] = z;
 
             velocities[i3] = 0;
@@ -89,14 +86,15 @@ export const gravityParticles = {
     update(clock, mouse, camera) {
         if (!this.objects.particles) return;
 
-        // --- Update Mouse Position in 3D ---
+        camera.position.set(0, 8, 15);
+        camera.lookAt(0, 0, 0);
+
         this.objects.raycaster.setFromCamera(mouse, camera);
         const intersects = this.objects.raycaster.intersectObject(this.objects.interactionPlane);
         if (intersects.length > 0) {
             this.objects.mousePosition3D.copy(intersects[0].point);
         }
 
-        // --- Physics Simulation (on the CPU) ---
         const positions = this.objects.particles.geometry.attributes.position.array;
         const velocities = this.objects.particles.geometry.attributes.velocity.array;
         const particlePosition = new THREE.Vector3();
@@ -105,7 +103,6 @@ export const gravityParticles = {
         for (let i = 0; i < this.config.particleCount; i++) {
             const i3 = i * 3;
             
-            // Mouse Repulsion
             particlePosition.set(positions[i3], positions[i3 + 1], positions[i3 + 2]);
             const dist = particlePosition.distanceTo(this.objects.mousePosition3D);
             if (dist < this.config.mouseRepelRadius) {
@@ -117,24 +114,19 @@ export const gravityParticles = {
                 velocities[i3 + 2] += repelDirection.z * repelForce;
             }
 
-            // Apply gravity
             velocities[i3 + 1] += this.config.gravity;
 
-            // Update position
             positions[i3] += velocities[i3];
             positions[i3 + 1] += velocities[i3 + 1];
             positions[i3 + 2] += velocities[i3 + 2];
             
-            // Apply friction
             velocities[i3] *= this.config.friction;
             velocities[i3 + 1] *= this.config.friction;
             velocities[i3 + 2] *= this.config.friction;
 
-            // Floor bounce
             if (positions[i3 + 1] < 0) {
                 positions[i3 + 1] = 0;
                 velocities[i3 + 1] *= -this.config.bounce;
-                // Floor friction
                 velocities[i3] *= 0.9;
                 velocities[i3 + 2] *= 0.9;
             }
@@ -158,7 +150,7 @@ export const gravityParticles = {
         container.innerHTML = `
             <h3>Simulation</h3>
             ${createSlider('particleCount', 'Count', 1000, 50000, this.config.particleCount, '1000')}
-            ${createSlider('gravity', 'Gravity', -0.01, 0, '0.0001')}
+            ${createSlider('gravity', 'Gravity', -0.01, 0, this.config.gravity, '0.0001')}
             ${createSlider('bounce', 'Bounce', 0.1, 1, this.config.bounce, '0.01')}
             ${createSlider('friction', 'Air Friction', 0.9, 1, this.config.friction, '0.001')}
             <h3>Appearance</h3>
