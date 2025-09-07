@@ -2,14 +2,13 @@ import * as THREE from 'three';
 
 let scene, camera, renderer;
 let activeSceneUpdater = null;
-let activeSceneName = ''; // Keep track of the current scene's name
+let activeSceneName = '';
 const mouse = new THREE.Vector2();
 const clock = new THREE.Clock();
 const loadedScenes = {};
-const defaultConfigs = {}; // Store default configs for comparison
+const defaultConfigs = {};
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 
-                    'bugSwarm.js', 'oceanView.js', 'particleVortex.js', 'colorCloud.js', 'gravityParticles.js', 'fluidParticles.js'];
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 'bugSwarm.js', 'oceanView.js', 'colorCloud.js', 'gravityParticles.js', 'fluidParticles.js'];
 
 async function init() {
     scene = new THREE.Scene();
@@ -89,19 +88,13 @@ function switchScene(sceneName) {
 
     loadedScenes[sceneName].config = JSON.parse(JSON.stringify(defaultConfigs[sceneName]));
     
-    camera.position.set(0,0,1);
-    camera.rotation.set(0,0,0);
     scene.rotation.set(0,0,0);
 
     activeSceneUpdater = loadedScenes[sceneName];
     activeSceneName = sceneName;
     
     document.getElementById('page-title').textContent = `Welcome to ${activeSceneUpdater.title || 'the Void'}`;
-    document.getElementById('page-subtitle').textContent = sceneName === 'deepSpace'
-        ? 'Move your mouse to explore the cosmos. Use the controls to customize your journey!'
-        : 'Watch the mesmerizing fluid dynamics. Use the controls to change the flow.';
     
-    // --- FIX: Pass the renderer to the scene's init and createControls functions ---
     activeSceneUpdater.init(scene, renderer);
     activeSceneUpdater.createControls(scene, renderer);
 
