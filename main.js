@@ -8,7 +8,7 @@ const clock = new THREE.Clock();
 const loadedScenes = {};
 const defaultConfigs = {}; // Store default configs for comparison
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 'bugSwarm.js', 'oceanView.js', 'particleVortex.js'];
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 'bugSwarm.js', 'oceanView.js', 'particleVortex.js', 'colorCloud.js'];
 
 async function init() {
     scene = new THREE.Scene();
