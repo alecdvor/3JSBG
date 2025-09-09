@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three'; 
 // --- Import Addons from a CDN ---
 import { Water } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/objects/Water.js';
 import { Sky } from 'https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/objects/Sky.js';
