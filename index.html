@@ -7,26 +7,10 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <canvas id="bg-canvas"></canvas>
-
-    <div class="content">
-        <h1 id="page-title">Welcome to the Void</h1>
-        <p id="page-subtitle">Move your mouse to explore the cosmos. Use the controls to customize your journey!</p>
-    </div>
-
-    <div id="controls">
-        <div class="controls-header">
-            <h2 id="controls-title">Customize Scene</h2>
-            <button id="hideControlsBtn" class="hide-btn" title="Hide Controls">&times;</button>
-        </div>
-        <div id="scene-controls-container"></div>
-        <button id="generateCodeBtn">Generate Code</button>
-    </div>
-    
     <button id="open-scene-modal-btn" class="show-btn" title="Select Scene">🎨</button>
     <button id="showControlsBtn" class="show-btn" title="Show Controls">⚙️</button>
 
-    <div id="welcome-modal" class="modal-overlay">
+    <div id="welcome-modal" class="modal-overlay visible">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Welcome!</h2>
@@ -38,41 +22,10 @@
         </div>
     </div>
 
-    <div id="scene-selector-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Select a Scene</h2>
-                <button id="close-scene-modal-btn" class="close-modal-btn">&times;</button>
-            </div>
-            <div id="scene-buttons-container"></div>
-            <button id="toggleContentBtn" class="scene-btn">Toggle Content</button>
-        </div>
-    </div>
-
-    <div id="code-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Embed Code</h2>
-                <button id="close-code-modal-btn" class="close-modal-btn">&times;</button>
-            </div>
-            <textarea id="embed-code" readonly></textarea>
-            <button id="copy-code-btn">Copy to Clipboard</button>
-        </div>
-    </div>
-
     <script type="importmap">
         { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js" } }
     </script>
     <script type="module" src="main.js"></script>
     
-    <script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
-    <script>
-    kofiWidgetOverlay.draw('alecdvor', {
-    'type': 'floating-chat',
-    'floating-chat.donateButton.text': 'Support me',
-    'floating-chat.donateButton.background-color': '#323842',
-    'floating-chat.donateButton.text-color': '#fff'
-     });
-</script>
-</body>
+    </body>
 </html>
