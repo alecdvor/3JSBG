@@ -10,7 +10,7 @@ const defaultConfigs = {};
 
 const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 
                     'candyField.js', 'bugSwarm.js', 'oceanView.js', 'colorCloud.js', 'gravityParticles.js', 'fluidParticles.js', 
-                    'rainyDay3D.js', 'orbitalLights.js'];
+                    'rainyDay3D.js', 'orbitalLights.js', 'shapeLife.js'];
 
 async function init() {
     scene = new THREE.Scene();
