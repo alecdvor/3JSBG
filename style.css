@@ -60,6 +60,11 @@ body {
     opacity: 1;
     pointer-events: auto;
 }
+/* NEW: Make the welcome modal visible on page load */
+#welcome-modal {
+    opacity: 1;
+    pointer-events: auto;
+}
 .modal-content {
     background: rgba(40, 40, 50, 0.9);
     padding: 30px;
@@ -71,7 +76,7 @@ body {
     transform: scale(0.95);
     transition: transform 0.3s ease;
 }
-.modal-overlay.visible .modal-content {
+.modal-overlay.visible .modal-content, #welcome-modal .modal-content {
     transform: scale(1);
 }
 .modal-header {
@@ -98,6 +103,28 @@ body {
 .close-modal-btn:hover {
     color: white;
 }
+.modal-content p {
+    color: #ccc;
+    line-height: 1.6;
+}
+.modal-footer {
+    margin-top: 25px;
+    text-align: right;
+}
+.ok-btn {
+    background: #4A90E2;
+    border: none;
+    color: white;
+    padding: 10px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+}
+.ok-btn:hover {
+    background-color: #357ABD;
+}
+
 
 /* --- Scene Selector Modal Specific Styles --- */
 #scene-selector-modal .modal-content {
@@ -150,15 +177,12 @@ body {
     transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     opacity: 0; transform: scale(0); pointer-events: none;
 }
-
-/* --- UPDATED BUTTON POSITION --- */
 #open-scene-modal-btn {
-    left: 50%; /* Position the left edge at the center */
+    left: 50%;
     opacity: 1;
-    transform: translateX(-50%) scale(1); /* Shift left by half its width and scale */
+    transform: translateX(-50%) scale(1);
     pointer-events: auto;
 }
-
 .show-btn.visible { opacity: 1; transform: scale(1); pointer-events: auto; }
 #showControlsBtn { right: 20px; }
 
