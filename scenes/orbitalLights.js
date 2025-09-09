@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three'; 
 // --- Import Addons for Node Materials ---
 // Make sure your import map or build process can resolve these 'three/tsl' imports
 import { color, lights } from 'three/tsl';
