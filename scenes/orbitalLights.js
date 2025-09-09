@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { color, lights } from 'three/tsl';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
-export const orbitalScene = {
+export const orbitalLights = {
     title: "Orbital Lights",
     scene: null,
 
