@@ -8,7 +8,7 @@ const clock = new THREE.Clock();
 const loadedScenes = {};
 const defaultConfigs = {};
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'bouncingCubes.js', 
                     'triangleField.js', 'candyField.js', 'bugSwarm.js', 'oceanView.js', 'colorCloud.js', 
                     'gravityParticles.js', 'fluidParticles.js', 'rainyDay3D.js', 'shapeLife.js', 'volumetricSmoke.js', 
                     'orbitalLights.js'];
