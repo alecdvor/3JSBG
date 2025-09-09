@@ -8,9 +8,7 @@ const clock = new THREE.Clock();
 const loadedScenes = {};
 const defaultConfigs = {};
 
-const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 
-                    'candyField.js', 'bugSwarm.js', 'oceanView.js', 'colorCloud.js', 'gravityParticles.js', 'fluidParticles.js', 
-                    'rainyDay3D.js', 'orbitalLights.js', 'shapeLife.js'];
+const sceneFiles = ['deepSpace.js', 'lavaLamp.js', 'smokeyLights.js', 'volumetricSmoke.js', 'bouncingCubes.js', 'triangleField.js', 'candyField.js', 'bugSwarm.js', 'oceanView.js', 'colorCloud.js', 'gravityParticles.js', 'fluidParticles.js', 'rainyDay3D.js', 'shapeLife.js'];
 
 async function init() {
     scene = new THREE.Scene();
@@ -37,18 +35,24 @@ async function init() {
         document.querySelector('.content').classList.toggle('hidden');
     });
     
+    // Welcome Modal
+    const welcomeModal = document.getElementById('welcome-modal');
+    document.getElementById('close-welcome-btn').addEventListener('click', () => welcomeModal.classList.remove('visible'));
+
+    // Controls Panel Hide/Show
     const controlsPanel = document.getElementById('controls');
     const hideControlsBtn = document.getElementById('hideControlsBtn');
     const showControlsBtn = document.getElementById('showControlsBtn');
     hideControlsBtn.addEventListener('click', () => { controlsPanel.classList.add('hidden'); showControlsBtn.classList.add('visible'); });
     showControlsBtn.addEventListener('click', () => { controlsPanel.classList.remove('hidden'); showControlsBtn.classList.remove('visible'); });
 
-    const selectorPanel = document.getElementById('scene-selector-modal');
-    document.getElementById('open-scene-modal-btn').addEventListener('click', () => selectorPanel.classList.add('visible'));
-    document.getElementById('close-scene-modal-btn').addEventListener('click', () => selectorPanel.classList.remove('visible'));
+    // Scene Selector Modal
+    const sceneModal = document.getElementById('scene-selector-modal');
+    document.getElementById('open-scene-modal-btn').addEventListener('click', () => sceneModal.classList.add('visible'));
+    document.getElementById('close-scene-modal-btn').addEventListener('click', () => sceneModal.classList.remove('visible'));
     
+    // Code Exporter Modal
     document.getElementById('generateCodeBtn').addEventListener('click', generateEmbedCode);
-
     const codeModal = document.getElementById('code-modal');
     document.getElementById('close-code-modal-btn').addEventListener('click', () => codeModal.classList.remove('visible'));
     document.getElementById('copy-code-btn').addEventListener('click', copyEmbedCode);
@@ -57,7 +61,7 @@ async function init() {
 async function loadScenesAndBuildUI() {
     const container = document.getElementById('scene-buttons-container');
     const sceneModal = document.getElementById('scene-selector-modal');
-
+    
     for (const fileName of sceneFiles) {
         const sceneName = fileName.replace('.js', '');
         try {
@@ -73,7 +77,7 @@ async function loadScenesAndBuildUI() {
                 btn.textContent = module[sceneName].title || sceneName;
                 btn.onclick = () => {
                     switchScene(sceneName);
-                    sceneModal.classList.remove('visible');
+                    sceneModal.classList.remove('visible'); // Close modal on selection
                 };
                 container.appendChild(btn);
             }
@@ -154,7 +158,6 @@ function onMouseMove(event) {
 function animate() {
     requestAnimationFrame(animate);
     if (activeSceneUpdater) {
-        // --- FIX: Pass the renderer to the update function ---
         activeSceneUpdater.update(clock, mouse, camera, renderer);
     }
     renderer.render(scene, camera);
@@ -162,3 +165,5 @@ function animate() {
 
 init();
 animate();
+
+
