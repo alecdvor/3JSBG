@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { color, lights } from 'three/tsl';
-// NO MORE MATERIAL IMPORTS NEEDED FOR THE LIGHTS
+// 1. Add NodeMaterial to the import list from 'three/tsl'
+import { NodeMaterial, color, lights } from 'three/tsl';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
@@ -26,10 +26,10 @@ export const orbitalLights = {
         const sphereGeometry = new THREE.SphereGeometry(0.025, 16, 8);
 
         const addLight = (hexColor) => {
-            // FINAL CORRECTION: Use the built-in NodeMaterial via the 'nodes' namespace
-            const material = new THREE.nodes.NodeMaterial();
+            // 2. Use the directly imported NodeMaterial
+            const material = new NodeMaterial();
             material.colorNode = color(hexColor);
-            material.lightsNode = lights(); // This makes the sphere ignore scene lighting and just show its own color
+            material.lightsNode = lights();
 
             const mesh = new THREE.Mesh(sphereGeometry, material);
             const light = new THREE.PointLight(hexColor, 1);
