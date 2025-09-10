@@ -1,7 +1,6 @@
-import * as THREE from 'three'; 
-// --- Import Addons for Node Materials ---
-// Make sure your import map or build process can resolve these 'three/tsl' imports
+import * as THREE from 'three';
 import { color, lights } from 'three/tsl';
+import { NodeMaterial } from 'three/addons/nodes/materials/NodeMaterial.js';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
@@ -20,21 +19,20 @@ export const orbitalLights = {
 
     objects: {},
 
-    init(scene, renderer) { // Added renderer to match the required format, though it's not used here
+    init(scene, renderer) {
         this.scene = scene;
         this.scene.background = new THREE.Color(0x000000);
 
-        // --- Lights ---
-        // We create helper meshes to visualize the light positions, just like the oceanView scene.
         const sphereGeometry = new THREE.SphereGeometry(0.025, 16, 8);
 
+        // Helper function to create lights with visible meshes
         const addLight = (hexColor) => {
-            const material = new THREE.NodeMaterial();
+            const material = new NodeMaterial();
             material.colorNode = color(hexColor);
-            material.lightsNode = lights(); // This mesh ignores other scene lights
+            material.lightsNode = lights();
 
             const mesh = new THREE.Mesh(sphereGeometry, material);
-            const light = new THREE.PointLight(hexColor, 1); // Intensity set to 1
+            const light = new THREE.PointLight(hexColor, 1);
             light.add(mesh);
             this.scene.add(light);
             return light;
@@ -44,7 +42,6 @@ export const orbitalLights = {
         this.objects.light2 = addLight(this.config.light2Color);
         this.objects.light3 = addLight(this.config.light3Color);
 
-        // This object will hold the small sphere meshes for cleanup
         this.objects.lightMeshes = [
             this.objects.light1.children[0],
             this.objects.light2.children[0],
@@ -61,8 +58,6 @@ export const orbitalLights = {
             this.objects.particles.material.dispose();
         }
 
-        // --- Define the Custom Lighting Model *inside* this function ---
-        // This keeps it within the scope of the exported object, matching the required format.
         class CustomLightingModel extends THREE.LightingModel {
             direct({ lightColor, reflectedLight }) {
                 reflectedLight.directDiffuse.addAssign(lightColor);
@@ -79,7 +74,6 @@ export const orbitalLights = {
         }
         geometry.setFromPoints(positions);
 
-        // --- PointsNodeMaterial Setup ---
         const material = new THREE.PointsNodeMaterial();
         const allLightsNode = lights([this.objects.light1, this.objects.light2, this.objects.light3]);
         const lightingModel = new CustomLightingModel();
@@ -92,25 +86,22 @@ export const orbitalLights = {
         this.scene.add(this.objects.particles);
     },
 
-    update(clock, mouse, camera) { // Matched signature, though mouse/camera aren't used
+    update(clock, mouse, camera) {
         if (!this.objects.light1) return;
 
         const time = clock.getElapsedTime() * this.config.lightSpeed;
         const scale = 0.5;
 
-        // Animate lights
         this.objects.light1.position.set(Math.sin(time * 0.7) * scale, Math.cos(time * 0.5) * scale, Math.cos(time * 0.3) * scale);
         this.objects.light2.position.set(Math.cos(time * 0.3) * scale, Math.sin(time * 0.5) * scale, Math.sin(time * 0.7) * scale);
         this.objects.light3.position.set(Math.sin(time * 0.7) * scale, Math.cos(time * 0.3) * scale, Math.sin(time * 0.5) * scale);
 
-        // Gently rotate the whole scene
         this.scene.rotation.y = time * 0.1;
     },
 
     destroy() {
         if (!this.scene) return;
 
-        // Dispose of geometries and materials explicitly, like in oceanView.js
         this.objects.particles?.geometry.dispose();
         this.objects.particles?.material.dispose();
         this.objects.lightMeshes?.forEach(mesh => {
@@ -118,7 +109,6 @@ export const orbitalLights = {
             mesh.material.dispose();
         });
 
-        // The scene clear() method will handle removing the objects
         this.scene.clear();
         this.objects = {};
     },
