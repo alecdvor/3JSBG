@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-// NO TSL import needed here anymore
+// ADD BACK the TSL import for the necessary tools
+import { LightingModel, lights } from 'three/tsl';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
@@ -25,7 +26,6 @@ export const orbitalLights = {
         const sphereGeometry = new THREE.SphereGeometry(0.025, 16, 8);
 
         const addLight = (hexColor) => {
-            // THE SIMPLIFIED SOLUTION: Use a standard MeshBasicMaterial
             const material = new THREE.MeshBasicMaterial({ color: hexColor });
 
             const mesh = new THREE.Mesh(sphereGeometry, material);
@@ -55,9 +55,8 @@ export const orbitalLights = {
             this.objects.particles.material.dispose();
         }
 
-        // NOTE: The CustomLightingModel and PointsNodeMaterial below are part of the
-        // main WebGPU build and do NOT require the 'tsl' import for this part to work.
-        class CustomLightingModel extends THREE.LightingModel {
+        // 1. Extend the imported LightingModel directly
+        class CustomLightingModel extends LightingModel {
             direct({ lightColor, reflectedLight }) {
                 reflectedLight.directDiffuse.addAssign(lightColor);
             }
@@ -73,9 +72,9 @@ export const orbitalLights = {
         }
         geometry.setFromPoints(positions);
         
-        // This is the material for the particle cloud itself. This part is correct.
         const material = new THREE.PointsNodeMaterial();
-        const allLightsNode = THREE.lights([this.objects.light1, this.objects.light2, this.objects.light3]);
+        // 2. Call the imported lights() function directly
+        const allLightsNode = lights([this.objects.light1, this.objects.light2, this.objects.light3]);
         const lightingModel = new CustomLightingModel();
         const lightingModelContext = allLightsNode.context({ lightingModel });
 
