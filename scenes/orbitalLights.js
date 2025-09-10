@@ -1,7 +1,4 @@
 import * as THREE from 'three';
-import { lights } from 'three/tsl';
-// 1. ADD THE FINAL IMPORT for the particle material
-import { PointsNodeMaterial } from 'three/addons/nodes/materials/PointsNodeMaterial.js';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
@@ -24,26 +21,13 @@ export const orbitalLights = {
         this.scene = scene;
         this.scene.background = new THREE.Color(0x000000);
 
-        const sphereGeometry = new THREE.SphereGeometry(0.025, 16, 8);
-
-        const addLight = (hexColor) => {
-            const material = new THREE.MeshBasicMaterial({ color: hexColor });
-            const mesh = new THREE.Mesh(sphereGeometry, material);
-            const light = new THREE.PointLight(hexColor, 1);
-            light.add(mesh);
-            this.scene.add(light);
-            return light;
-        };
-
-        this.objects.light1 = addLight(this.config.light1Color);
-        this.objects.light2 = addLight(this.config.light2Color);
-        this.objects.light3 = addLight(this.config.light3Color);
-
-        this.objects.lightMeshes = [
-            this.objects.light1.children[0],
-            this.objects.light2.children[0],
-            this.objects.light3.children[0]
-        ];
+        // Lights are now just position helpers; their color is sent to the shader
+        this.objects.light1 = new THREE.Object3D();
+        this.scene.add(this.objects.light1);
+        this.objects.light2 = new THREE.Object3D();
+        this.scene.add(this.objects.light2);
+        this.objects.light3 = new THREE.Object3D();
+        this.scene.add(this.objects.light3);
 
         this.regenerateParticles();
     },
@@ -54,52 +38,102 @@ export const orbitalLights = {
             this.objects.particles.geometry.dispose();
             this.objects.particles.material.dispose();
         }
-        
+
         const geometry = new THREE.BufferGeometry();
-        const positions = [];
-        const cloudRadius = this.config.cloudRadius;
+        const positions = new Float32Array(this.config.particleCount * 3);
 
         for (let i = 0; i < this.config.particleCount; i++) {
-            const point = new THREE.Vector3().random().subScalar(0.5).multiplyScalar(cloudRadius * 2);
-            positions.push(point);
+            const i3 = i * 3;
+            const pos = new THREE.Vector3().random().subScalar(0.5).multiplyScalar(this.config.cloudRadius * 2);
+            positions[i3] = pos.x;
+            positions[i3 + 1] = pos.y;
+            positions[i3 + 2] = pos.z;
         }
-        geometry.setFromPoints(positions);
-        
-        // 2. Use the directly imported PointsNodeMaterial
-        const material = new PointsNodeMaterial();
-        
-        const allLightsNode = lights([this.objects.light1, this.objects.light2, this.objects.light3]);
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-        material.colorNode = allLightsNode;
-        material.sizeNode = this.config.particleSize;
+        // --- Custom Shader Material ---
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                uSize: { value: this.config.particleSize },
+                uLight1Pos: { value: new THREE.Vector3() },
+                uLight1Color: { value: new THREE.Color(this.config.light1Color) },
+                uLight2Pos: { value: new THREE.Vector3() },
+                uLight2Color: { value: new THREE.Color(this.config.light2Color) },
+                uLight3Pos: { value: new THREE.Vector3() },
+                uLight3Color: { value: new THREE.Color(this.config.light3Color) },
+            },
+            vertexShader: `
+                uniform float uSize;
+                uniform vec3 uLight1Pos;
+                uniform vec3 uLight1Color;
+                uniform vec3 uLight2Pos;
+                uniform vec3 uLight2Color;
+                uniform vec3 uLight3Pos;
+                uniform vec3 uLight3Color;
+
+                varying vec3 vColor;
+
+                void main() {
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = uSize * (300.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+
+                    // Calculate color based on inverse square distance to lights
+                    float dist1 = max(0.01, distance(position, uLight1Pos));
+                    float dist2 = max(0.01, distance(position, uLight2Pos));
+                    float dist3 = max(0.01, distance(position, uLight3Pos));
+
+                    vec3 color1 = uLight1Color / (dist1 * dist1);
+                    vec3 color2 = uLight2Color / (dist2 * dist2);
+                    vec3 color3 = uLight3Color / (dist3 * dist3);
+
+                    vColor = color1 + color2 + color3;
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                void main() {
+                    if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard; // Make points circular
+                    gl_FragColor = vec4(vColor, 1.0);
+                }
+            `,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            transparent: true,
+        });
 
         this.objects.particles = new THREE.Points(geometry, material);
         this.scene.add(this.objects.particles);
     },
 
     update(clock, mouse, camera) {
-        if (!this.objects.light1) return;
+        if (!this.objects.particles) return;
 
         const time = clock.getElapsedTime() * this.config.lightSpeed;
         const scale = 0.5;
 
+        // Animate light positions
         this.objects.light1.position.set(Math.sin(time * 0.7) * scale, Math.cos(time * 0.5) * scale, Math.cos(time * 0.3) * scale);
         this.objects.light2.position.set(Math.cos(time * 0.3) * scale, Math.sin(time * 0.5) * scale, Math.sin(time * 0.7) * scale);
         this.objects.light3.position.set(Math.sin(time * 0.7) * scale, Math.cos(time * 0.3) * scale, Math.sin(time * 0.5) * scale);
+
+        // Update shader uniforms with the new light positions
+        const material = this.objects.particles.material;
+        material.uniforms.uLight1Pos.value.copy(this.objects.light1.position);
+        material.uniforms.uLight2Pos.value.copy(this.objects.light2.position);
+        material.uniforms.uLight3Pos.value.copy(this.objects.light3.position);
 
         this.scene.rotation.y = time * 0.1;
     },
 
     destroy() {
         if (!this.scene) return;
-
-        this.objects.particles?.geometry.dispose();
-        this.objects.particles?.material.dispose();
-        this.objects.lightMeshes?.forEach(mesh => {
-            mesh.geometry.dispose();
-            mesh.material.dispose();
+        this.scene.traverse(child => {
+            if (child.isPoints) {
+                child.geometry.dispose();
+                child.material.dispose();
+            }
         });
-
         this.scene.clear();
         this.objects = {};
     },
@@ -125,14 +159,16 @@ export const orbitalLights = {
         });
         
         addColorListeners(this.config, (key, value) => {
-            if (key === 'light1Color') this.objects.light1.color.set(value);
-            if (key === 'light2Color') this.objects.light2.color.set(value);
-            if (key === 'light3Color') this.objects.light3.color.set(value);
+            if (!this.objects.particles) return;
+            const material = this.objects.particles.material;
+            if (key === 'light1Color') material.uniforms.uLight1Color.value.set(value);
+            if (key === 'light2Color') material.uniforms.uLight2Color.value.set(value);
+            if (key === 'light3Color') material.uniforms.uLight3Color.value.set(value);
         });
         
         document.getElementById('particleSize').addEventListener('input', (e) => {
             this.config.particleSize = parseFloat(e.target.value);
-            if (this.objects.particles) this.objects.particles.material.sizeNode = this.config.particleSize;
+            if (this.objects.particles) this.objects.particles.material.uniforms.uSize.value = this.config.particleSize;
         });
     }
 };
