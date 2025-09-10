@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { color, lights } from 'three/tsl';
-import { NodeMaterial } from 'three/addons/nodes/materials/NodeMaterial.js';
+import { NodeMaterial } from 'three/src/materials/NodeMaterial.js';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
