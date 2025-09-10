@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-// ADD BACK the TSL import for the necessary tools
-import { LightingModel, lights } from 'three/tsl';
+// We only need the 'lights' function from TSL
+import { lights } from 'three/tsl';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
@@ -27,7 +27,6 @@ export const orbitalLights = {
 
         const addLight = (hexColor) => {
             const material = new THREE.MeshBasicMaterial({ color: hexColor });
-
             const mesh = new THREE.Mesh(sphereGeometry, material);
             const light = new THREE.PointLight(hexColor, 1);
             light.add(mesh);
@@ -55,12 +54,7 @@ export const orbitalLights = {
             this.objects.particles.material.dispose();
         }
 
-        // 1. Extend the imported LightingModel directly
-        class CustomLightingModel extends LightingModel {
-            direct({ lightColor, reflectedLight }) {
-                reflectedLight.directDiffuse.addAssign(lightColor);
-            }
-        }
+        // The CustomLightingModel class is no longer needed and has been removed.
         
         const geometry = new THREE.BufferGeometry();
         const positions = [];
@@ -73,12 +67,14 @@ export const orbitalLights = {
         geometry.setFromPoints(positions);
         
         const material = new THREE.PointsNodeMaterial();
-        // 2. Call the imported lights() function directly
+        
+        // 1. Create a node that calculates the combined influence of all lights.
         const allLightsNode = lights([this.objects.light1, this.objects.light2, this.objects.light3]);
-        const lightingModel = new CustomLightingModel();
-        const lightingModelContext = allLightsNode.context({ lightingModel });
 
-        material.lightsNode = lightingModelContext;
+        // 2. Directly assign this light calculation to the material's final color.
+        material.colorNode = allLightsNode;
+        
+        // 3. Set the particle size.
         material.sizeNode = this.config.particleSize;
 
         this.objects.particles = new THREE.Points(geometry, material);
