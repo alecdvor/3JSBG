@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-// We only need the 'lights' function from TSL
 import { lights } from 'three/tsl';
+// 1. ADD THE FINAL IMPORT for the particle material
+import { PointsNodeMaterial } from 'three/addons/nodes/materials/PointsNodeMaterial.js';
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
@@ -53,8 +54,6 @@ export const orbitalLights = {
             this.objects.particles.geometry.dispose();
             this.objects.particles.material.dispose();
         }
-
-        // The CustomLightingModel class is no longer needed and has been removed.
         
         const geometry = new THREE.BufferGeometry();
         const positions = [];
@@ -66,15 +65,12 @@ export const orbitalLights = {
         }
         geometry.setFromPoints(positions);
         
-        const material = new THREE.PointsNodeMaterial();
+        // 2. Use the directly imported PointsNodeMaterial
+        const material = new PointsNodeMaterial();
         
-        // 1. Create a node that calculates the combined influence of all lights.
         const allLightsNode = lights([this.objects.light1, this.objects.light2, this.objects.light3]);
 
-        // 2. Directly assign this light calculation to the material's final color.
         material.colorNode = allLightsNode;
-        
-        // 3. Set the particle size.
         material.sizeNode = this.config.particleSize;
 
         this.objects.particles = new THREE.Points(geometry, material);
