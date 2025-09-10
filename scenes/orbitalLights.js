@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { color, lights } from 'three/tsl';
-// CORRECTED IMPORT: Use MeshBasicNodeMaterial for the light helpers
-import { MeshBasicNodeMaterial } from 'three/addons/nodes/materials/MeshBasicNodeMaterial.js';
+// NO MORE MATERIAL IMPORTS NEEDED FOR THE LIGHTS
 import { createSlider, createColorPicker, addSliderListeners, addColorListeners } from '../utils.js';
 
 export const orbitalLights = {
@@ -26,13 +25,12 @@ export const orbitalLights = {
 
         const sphereGeometry = new THREE.SphereGeometry(0.025, 16, 8);
 
-        // Helper function to create lights with visible meshes
         const addLight = (hexColor) => {
-            // CORRECTED CONSTRUCTOR: Use MeshBasicNodeMaterial here
-            const material = new MeshBasicNodeMaterial();
+            // FINAL CORRECTION: Use the built-in NodeMaterial via the 'nodes' namespace
+            const material = new THREE.nodes.NodeMaterial();
             material.colorNode = color(hexColor);
-            // We don't need to set lightsNode for a basic emissive material
-            
+            material.lightsNode = lights(); // This makes the sphere ignore scene lighting and just show its own color
+
             const mesh = new THREE.Mesh(sphereGeometry, material);
             const light = new THREE.PointLight(hexColor, 1);
             light.add(mesh);
