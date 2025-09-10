@@ -10,7 +10,7 @@ export const orbitalLights = {
         particleSize: 1.5,
         cloudRadius: 1.5,
         lightSpeed: 0.2,
-        intensity: 0.5, // Added intensity to config
+        intensity: 0.5, // Master intensity control for the lights
         light1Color: '#ffaa00',
         light2Color: '#0040ff',
         light3Color: '#80ff80',
@@ -22,6 +22,7 @@ export const orbitalLights = {
         this.scene = scene;
         this.scene.background = new THREE.Color(0x000000);
 
+        // Lights are simple objects to track position for the shader
         this.objects.light1 = new THREE.Object3D();
         this.scene.add(this.objects.light1);
         this.objects.light2 = new THREE.Object3D();
@@ -51,6 +52,7 @@ export const orbitalLights = {
         }
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
+        // --- Custom Shader Material ---
         const material = new THREE.ShaderMaterial({
             uniforms: {
                 uSize: { value: this.config.particleSize },
@@ -71,30 +73,25 @@ export const orbitalLights = {
                 uniform vec3 uLight2Color;
                 uniform vec3 uLight3Pos;
                 uniform vec3 uLight3Color;
-
                 varying vec3 vColor;
-
                 void main() {
                     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                     gl_PointSize = uSize * (300.0 / -mvPosition.z);
                     gl_Position = projectionMatrix * mvPosition;
-
                     float dist1 = distance(position, uLight1Pos);
                     float dist2 = distance(position, uLight2Pos);
                     float dist3 = distance(position, uLight3Pos);
-
-                    // UPDATED, smoother lighting falloff formula
+                    // Smoother, controlled lighting falloff to prevent overexposure
                     vec3 color1 = uIntensity * uLight1Color / (1.0 + dist1 * dist1);
                     vec3 color2 = uIntensity * uLight2Color / (1.0 + dist2 * dist2);
                     vec3 color3 = uIntensity * uLight3Color / (1.0 + dist3 * dist3);
-
                     vColor = color1 + color2 + color3;
                 }
             `,
             fragmentShader: `
                 varying vec3 vColor;
                 void main() {
-                    if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard;
+                    if (length(gl_PointCoord - vec2(0.5)) > 0.5) discard; // Make points circular
                     gl_FragColor = vec4(vColor, 1.0);
                 }
             `,
@@ -110,19 +107,28 @@ export const orbitalLights = {
     update(clock, mouse, camera) {
         if (!this.objects.particles) return;
 
-        const time = clock.getElapsedTime() * this.config.lightSpeed;
+        const time = clock.getElapsedTime();
+        const lightTime = time * this.config.lightSpeed;
         const scale = 0.5;
 
-        this.objects.light1.position.set(Math.sin(time * 0.7) * scale, Math.cos(time * 0.5) * scale, Math.cos(time * 0.3) * scale);
-        this.objects.light2.position.set(Math.cos(time * 0.3) * scale, Math.sin(time * 0.5) * scale, Math.sin(time * 0.7) * scale);
-        this.objects.light3.position.set(Math.sin(time * 0.7) * scale, Math.cos(time * 0.3) * scale, Math.sin(time * 0.5) * scale);
+        // Animate light positions
+        this.objects.light1.position.set(Math.sin(lightTime * 0.7) * scale, Math.cos(lightTime * 0.5) * scale, Math.cos(lightTime * 0.3) * scale);
+        this.objects.light2.position.set(Math.cos(lightTime * 0.3) * scale, Math.sin(lightTime * 0.5) * scale, Math.sin(lightTime * 0.7) * scale);
+        this.objects.light3.position.set(Math.sin(lightTime * 0.7) * scale, Math.cos(lightTime * 0.3) * scale, Math.sin(lightTime * 0.5) * scale);
 
+        // Update shader uniforms
         const material = this.objects.particles.material;
         material.uniforms.uLight1Pos.value.copy(this.objects.light1.position);
         material.uniforms.uLight2Pos.value.copy(this.objects.light2.position);
         material.uniforms.uLight3Pos.value.copy(this.objects.light3.position);
+        
+        // Rotate the particle cloud itself
+        this.objects.particles.rotation.y = time * 0.1;
 
-        this.scene.rotation.y = time * 0.1;
+        // Gently orbit the camera to prevent static, overexposed views
+        camera.position.x = Math.sin(time * 0.05) * 4;
+        camera.position.z = Math.cos(time * 0.05) * 4;
+        camera.lookAt(this.scene.position); // Keep camera focused on the center
     },
 
     destroy() {
@@ -171,7 +177,6 @@ export const orbitalLights = {
             if (this.objects.particles) this.objects.particles.material.uniforms.uSize.value = this.config.particleSize;
         });
 
-        // Add event listener for the new intensity slider
         document.getElementById('intensity').addEventListener('input', (e) => {
             this.config.intensity = parseFloat(e.target.value);
             if (this.objects.particles) this.objects.particles.material.uniforms.uIntensity.value = this.config.intensity;
